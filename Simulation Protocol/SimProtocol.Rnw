@@ -1,0 +1,434 @@
+\documentclass[11pt]{article}
+\usepackage{graphicx} % Required for inserting images
+\usepackage[utf8]{inputenc}
+\usepackage[hidelinks]{hyperref}
+\usepackage{fontawesome5}
+\usepackage{eso-pic}
+\usepackage{charter}
+\usepackage{geometry}
+\usepackage{multirow}
+\usepackage{multicol}
+\usepackage{amsmath}
+\usepackage{adjustbox}
+\usepackage{todonotes}
+\usepackage{caption} 
+\usepackage{xcolor}
+\usepackage{blindtext}
+\usepackage{titlesec}
+\usepackage{paralist}
+
+\usepackage[square,numbers]{natbib}
+\bibliographystyle{unsrtnat}
+
+% Seitenabstand
+ \newgeometry{
+     top=2cm,
+     bottom = 2cm,
+%     bottom=1in,
+     outer=1in,
+     inner= 1in
+ }
+
+
+\title{\textbf{Simulation Study Protocol} \\
+Adjusting for Outcome Reporting Bias in Meta-analysis: A Multiple Imputation Approach \\
+\author{Cora Burgwinkel and Leonhard Held}}
+
+\date{}
+
+\input{newCommands}
+
+\begin{document}
+
+\maketitle
+
+
+\tableofcontents
+\thispagestyle{empty}
+\newpage
+
+\setcounter{page}{1}
+
+\section{Background}
+Selective reporting of outcomes in clinical trial reports can be described as the reporting of a subset
+of the originally recorded outcome variables in the final report. Selective outcome reporting can
+create outcome reporting bias (ORB) when the decision to report results within published studies is
+influenced by the significance or direction of the results \cite{chan2005identifying}.
+
+Selective reporting is essentially a missing data problem. Due to the lack of awareness of ORB,
+the common practice is to simply ignore the missing outcome data and to carry out a univariate
+meta-analysis, where the outcomes are analyzed separately, using complete case data, so only studies
+which reported the outcome are included in the meta-analysis \cite{riley2007evaluation}.
+
+However, given ORB, studies
+that selectively omit or change outcomes of interest might distort the overall treatment effect because
+the analysis is based on a biased subset of the evidence \cite{thomas2022catalogue}. In practice, multiple outcomes are of
+interest in the systematic review process. These outcomes are often correlated because each patient
+contributes data to multiple endpoints, leading to correlated effect estimates within studies. A multivariate meta-analysis can jointly synthesize these effect estimates across studies and results in smaller standard errors compared to analyzing each outcome separately using univariate meta-analyis \cite{jackson2011multivariate, riley2009multivariate}. The idea is to borrow strength across outcomes, so to learn about the unreported study outcomes through the reported study outcomes \cite{kirkham2012multivariate}.
+
+\section{General Information}
+
+\subsection{Title}
+Assessing a multiple imputation approach to adjust for ORB under different meta-analysis settings. 
+
+\subsection{Contributors}
+Cora Burgwinkel and Leonhard Held
+
+\subsection{Description}
+We aim to evaluate the performance of our ORB adjustment method in meta-analysis through a simulation study. In this study, we will vary parameters such as the number of unreported study outcomes and the total number of studies, and compare the resulting meta-analytic settings in terms of bias, mean squared error (MSE) and coverage.
+
+\subsection{Aim}
+The aim of this simulation study is to evaluate the performance of the proposed ORB-adjustment method in the context of bivariate random-effects meta-analysis with two correlated outcomes. The simulation scenarios systematically vary the number of studies, the proportion of unreported study outcomes, the true treatment effects, between-study heterogeneity, and the between-study correlation to assess the performance across a range of meta-analytic settings.
+
+A key objective is to compare the performance of the ORB-adjusted estimate across different selection weights to that of the complete data estimate, which is based only on studies that reported the study outcome. In practice, missing outcome data are often ignored, leading to complete data analyses by default. Our goal is therefore to evaluate whether our proposed method provides less biased and more reliable estimates compared to the common but potentially flawed approach.
+
+Although the primary focus is on data that are missing not at random (MNAR), we also include  missing at random (MAR) scenarios. This allows us to investigate how the ORB-adjustment method performs under different missingness mechanisms and to assess its robustness to model misspecification.
+
+
+\section{Data-Generating Mechanism}
+
+The overall simulation study protocol follows best practice recommendations for simulation studies \cite{morris2019using, burton2006simulation} and closely follows the structure proposed by Siepe et al. \cite{siepe2024simulation}. We adapt their two-step data-generating mechanism to the context of bivariate random-effects meta-analysis and ORB. In the first step, a meta-analysis with two correlated outcomes is simulated. In the second step, ORB is introduced by selectively suppressing study outcomes based on the direction and statistical significance of the treatment effect estimates.
+
+\subsection{Step 1: Simulation of Bivariate Meta-analysis}
+
+The first step of the simulation process involves generating a bivariate random-effects meta-analysis. Each simulated meta-analysis consists of $k$ studies and 2 outcomes ($j = 1, 2$). For each study $i=1,\ldots,k$, treatment effects and their corresponding standard errors are generated for both outcomes.  We assume equal treatment and control arm sizes, \ie $n_i = n_{ti} = n_{ci} = 50$, giving a total sample size per study $i$ of $n_{ti} + n_{ci} = 100$.
+%\todo[inline]{OK, but it would be easy to extend this to different sample sizes in the different studies (e.g. 1 or 2 studies with large sample size 500). }
+This choice is consistent with the study size typically in clinical trials included in meta-analysis in simulation studies \cite{inthout2014hartung, saracini2024addressing}. A positive value of the study-specific true treatment effect indicates a beneficial effect of the intervention relative to placebo.\\
+
+The study-specific true treatment effects are drawn from a bivariate normal distribution:
+\begin{equation} \label{eq:multivariate}
+\begin{pmatrix}
+\theta_{i1} \\
+\theta_{i2}
+\end{pmatrix}
+\sim \Nor
+ \begin{pmatrix}
+  \begin{pmatrix}
+    \theta_1 \\
+    \theta_2
+  \end{pmatrix},  
+      \begin{pmatrix}
+    \tau_1^2 & \rho_B \tau_1 \tau_2 \\
+    \rho_B \tau_1 \tau_2 & \tau_2^2
+    \end{pmatrix}
+    \end{pmatrix},
+\end{equation}
+where $\theta_1$ and $\theta_2$ are the overall average treatment effects for outcomes 1 and 2, $\tau_1$ and $\tau_2$ are the between-study standard deviations of the two outcomes, and $\rho_B$ is the between-study correlation between the two outcomes. With real data, the between-study correlation $\rho_B$ can be estimated within a bivariate random-effects meta-analysis. In this simulation study, however, $\rho_B$ is treated as a fixed design parameter to control the degree of correlation between the two treatment effects.\\
+
+We simulate the $2\times2$ within-study covariance matrix  of study $i$ using the Wishart distribution:
+\begin{equation}
+\hat\Sigma_i^{\text{within}} \sim \Wish_2(\alpha, V),
+\end{equation}
+where $\Wish_2$ denotes the 2-dimensional Wishart distribution \cite[p.366]{held2020likelihood} with degrees of freedom $\alpha = 2(n_i - 1)$ and scale matrix 
+$$V = \frac{1}{(n_i-1)n_i} \begin{pmatrix}
+    1 & \rho_W  \\
+    \rho_W & 1
+    \end{pmatrix},$$ 
+where $\rho_W$ is the correlation of the study-specific effect estimates. This formulation ensures that the variances $\sigma_1^2$ and $\sigma_2^2 = 2/n_i$. Since we assume equal study sizes $n_i$, $\alpha$ and $V$ are the same for all studies $i$. 
+The observed effect estimates are drawn from a bivariate normal distribution conditional on the true effects given with
+\begin{equation}
+\begin{pmatrix}
+\hat{\nu}_{i1} \\
+\hat{\nu}_{i2}
+\end{pmatrix}
+\;\bigg|\;
+\begin{pmatrix}
+\theta_{i1} \\
+\theta_{i2}
+\end{pmatrix}
+\sim
+\mathcal{N}_2\!\left(
+\begin{pmatrix}
+\theta_{i1} \\ \theta_{i2}
+\end{pmatrix},
+\;\hat{\Sigma}^{\text{within}}_i
+\right).
+\end{equation}
+
+Using the Wishart distribution to generate $\hat{\Sigma}^{\text{within}}_i$ allows the variances and covariances to vary jointly, reflecting the sampling distribution of covariance estimates under multivariate normality. It also aligns the data-generating mechanism with the V matrix used in the \texttt{rma.mv()} model fitting, ensuring consistency between simulation and analysis.\\
+
+
+Higgins' $I^2$ is often used to quantify heterogeneity, and it estimates the proportion of the variance in study estimates that is due to heterogeneity \cite{higgins2002quantifying}. In practice, however, we need $\tau^2$, which can be derived from $I^2$ using
+\begin{equation}
+    \tau^2_j = \frac{I^2}{1-I^2} \cdot \sigma^2_j.
+\end{equation}
+
+In the simulation study, we consider $I^2 \in \{0, 0.3, 0.6, 0.9\}$ which represents no to high heterogeneity \cite{higgins2003measuring}. Since we set $n_i = 50$ and use $\sigma_1^2 = \sigma_2^2 = {2}/{n_i}$, we can determine the corresponding between-study heterogeneity variance values as $\tau^2_1 = \tau^2_2 \in \{0, 0.02, 0.06, 0.36\}$. 
+
+
+\subsubsection{Different factors of the data-generating mechanism}
+\label{ParametersSim}
+Meta-analyses will be generated under different simulation scenarios.  We will use the following values for our data-generating mechanism: 
+\begin{itemize}
+    \item the number of studies in the meta-analysis $k \in \{6, 12, 25\}$,
+    \item between-study heterogeneity variance $\tau^2_1 = \tau^2_2 \in \{0, 0.02, 0.06, 0.36\}$,
+    \item different true underlying treatment effects $\theta_1, \theta_2 \in \{0, 0.4, 0.8\}$,
+    \item between-study correlation $\rho_B \in \{0, 0.4, 0.8 \}$,
+    \item within-study correlation $\rho_{W} \in \{0, 0.4, 0.8\}$.
+\end{itemize}
+
+
+Empirical evidence shows that most meta-analysis include around 6 studies (IQR = 4-10), with systematic reviews themselves including a median of 12 studies (IQR = 8-21) \cite{nguyen2022changing}. To reflect this, we considered three representative scenarios corresponding to small (6 studies), medium (12 studies), and large (25 studies) meta-analyses. The first two sample sizes correspond closely to the median numbers observed empirically, while the third represents larger but still realistic meta-analyses, allowing us to examine performance as the amount of information increases. We assume equal between-study heterogeneity across outcomes, 
+$\tau^2_1 = \tau^2_2$, to simplify the design. The different true underlying treatment effects $\theta_j$ are based on simulation studies found in the literature \cite{kirkham2012multivariate, saracini2024addressing}. 
+We will use a full factorial design with a total of $3$ (number of studies) $\times 4$ (between-study heterogeneity variance) $\times 3$ (treatment effect $\theta_1$) $\times 3$ (treatment effect $\theta_2$) $\times 3$ (between-study correlation) $\times 3$ (within-study correlation) $= 972$ scenarios. 
+
+
+\subsection{Step 2: Simulation of ORB}
+
+After simulating $k$ studies, each providing an observed treatment effect $\hat\nu_{ij}$ with standard error $\hat\sigma_{ij}$ and treatment and control group sample sizes $n_{ti}$ and $n_{ci}$, we introduce ORB by selectively suppressing study outcomes in a way that depends on the magnitude and statistical significance of the treatment effect. This yields data that are MNAR. We only introduce ORB for outcome 1, allowing outcome 1 to borrow strength from the fully reported outcome 2 in the subsequent bivariate analysis. \\
+
+For each study $i$ and outcome $1$, we define the z-score
+\begin{equation}
+z_{i1} = \frac{\hat\nu_{i1}}{\hat\sigma_{i1}},
+\end{equation}
+where $v_{i1}$ denotes the estimated treatment effect for outcome $1$ in study $i$ and $\sigma_{i1}$ is the corresponding within-study standard error, obtained from the simulated within-study covariance matrix $\hat\Sigma_i^{\text{within}}$. This corresponds to the Wald statistic for testing the null hypothesis of no treatment effect on the generic continuous effect scale. Equivalently, one-sided or two-sided $p$-values can be computed from $z_{i1}$.\\
+
+We model the probability that study $i$ of outcome 1 is reported using a logistic selection model:
+\begin{equation}
+\label{SelFunc}
+\Pr(R_{i1}=1 \mid z_{i1}) \;=\;
+\operatorname{expit}\!\left(\alpha_1 + \delta_{1,\text{sim}} \, z_{i1}\right),
+\end{equation}
+where $R_{i1}\in\{0,1\}$ is the reporting indicator, $\alpha_1$ controls the baseline reporting rate for outcome $1$ and $\delta_{1,\text{sim}}$ is the selection weight. We vary $\delta_{1,\text{sim}}$ over a range of values to assess the sensitivity of nonrandom selection. Setting $\delta_{1,\text{sim}} = 0$ corresponds to a special MAR case, implying that selection has no influence on inference. In our setup, this also corresponds to missing completely at random (MCAR), since no covariates drive the reporting process, thus, the MAR and MCAR scenarios coincide. For the selection rule, we consider a one-sided preference for positive effects. This selection rule gives higher reporting probabilities to larger positive treatment effects.
+
+
+The intercept $\alpha_1$ is determined to target a desired fraction $1 - p_1$ of reported studies for outcome $1$.
+Specifically, $\alpha_1$ is chosen to satisfy
+\begin{equation} 
+    \alpha_1 = \operatorname{logit}\!\left(1 - p_1 \right) - \delta_{1,\text{sim}} \mathbb{E}(z_{i1})
+\end{equation}
+where $\mathbb{E}(z_{i1})$ denotes the expected standardized effect under the data-generating model:
+\begin{equation}
+    \mathbb{E}(z_{i1}) = 
+    \frac{\mathbb{E}(\hat \nu_{i1})}{\sqrt{\mathbb{E}(\hat\sigma^2_{i1}) + \tau^2_1}} =
+    \frac{\theta_{i1}}{\sqrt{2/n_i + \tau^2_1}}.
+\end{equation}
+This ensures that, on average, the proportion of reported outcomes matches the target reporting rate $1 - p_1$, while allowing the reporting probability to vary with the observed z-scores.\\ 
+
+\begin{table}[!ht]
+\centering
+\caption{Expected standardized effects $\mathbb{E}(z_{i1})$ for all combinations of treatment effects and between-study heterogeneity values.}
+\label{tab:StandEffects}
+<<echo = FALSE, results='asis'>>=
+#load library
+library(xtable)
+
+# define parameter values
+tau_squared <- c(0, 0.02, 0.06, 0.36)
+theta_ij <- c(0, 0.4, 0.8)
+n_i <- 50
+
+# function to estimate the expected standardized effects
+E_z_i1 <- outer(
+  theta_ij,
+  tau_squared,
+  Vectorize(function(theta, tau2) theta / sqrt(2 / n_i + tau2))
+)
+
+# Round for presentation
+E_z_i1 <- round(E_z_i1, 3)
+
+# Create data frame in manuscript-friendly layout
+variance_table <- data.frame(
+  `θ_ij` = theta_ij,
+  `τ² = 0` = E_z_i1[, 1],
+  `τ² = 0.02` = E_z_i1[, 2],
+  `τ² = 0.06` = E_z_i1[, 3],
+  `τ² = 0.36` = E_z_i1[, 4]
+)
+
+# Define custom header with math notation
+header <- list()
+header$pos <- list(0)  # add before first row
+header$command <- c(
+  paste0(
+    "\\toprule\n",
+    "$\\theta_{i1}$ & ",
+    paste(sprintf("$\\tau^2_1 = %.2f$", tau_squared), collapse = " & "),
+    " \\\\ \n",
+    "\\midrule\n"
+  )
+)
+
+# Generate xtable object with caption and label
+print(xtable(variance_table),
+      add.to.row = header,
+      include.colnames = FALSE, # delete column names because customized
+      include.rownames = FALSE,  # Exclude row names if not needed
+  #    tabular.environment = "tabular",  # Set table environment
+      floating = FALSE, 
+      sanitize.text.function = identity,
+      hline.after = c(-1, 0, nrow(variance_table)))
+
+@
+\end{table}
+
+Table \ref{tab:StandEffects} presents the expected standardized effects 
+$\mathbb{E}(z_{i1})$ for combinations of true treatment effects $\theta_{i1} \in \{0, 0.4, 0.8\}$ and between-study heterogeneity values $\tau^2_1 \in \{0, 0.02, 0.06, 0.36\}$ assuming equal study sizes of $n_i=50$. As shown, larger true effects yield higher standardized effects, whereas increasing between-study heterogeneity reduces the expected standardized effects due to greater variability in the underlying study effects.
+
+It is important to note that while our simulation uses a known missing data mechanism, \ie, selective reporting based on a logistic function of the one-sided $p$-value, no information about the cause of missingness is assumed to be available once the data are generated. This reflects the practical setting in which some outcomes are unreported, but their classification into, \eg, high risk or low risk of bias as per the ORBIT methodology is unknown. As a result, Copas et al. \cite{copas2019model} method, which requires the ORBIT classification and adjusts only for outcomes deemed at HR of bias, is not directly comparable to our methodology.
+
+\subsubsection{Different factors for the simulation of ORB}
+ORB is simulated under different simulation scenarios. We will consider the following values for selectively excluding treatment effects from the meta-analysis:
+
+\begin{itemize}
+    \item selection weight for outcome 1 $\delta_{1, \text{sim}}$ = 0 - 1.3, where $\delta_{1, \text{sim}} = 0.5$ corresponds to a moderate selection,
+     \item the proportion of unreported studies for outcome 1: $1-p_1: 0\%, 20\%, 40\%$.
+\end{itemize}
+
+The selection weight will be explored over the range of values recommended by Carpenter et al. \cite{carpenter2011assessing}. The chosen proportions of unreported studies represent scenarios with no, low, and moderate degrees of missingness, allowing us to examine how increasing levels of ORB affect model performance.
+We use a full factorial design leading to $14$ (selection weight) $\times 3$ (proportion of unreported studies) = $42$ scenarios.
+
+\subsection{Summary of all considered simulation scenarios}
+
+Table \ref{tab:SimStudy} summarizes the key factors and parameter values investigated in the simulation study. The design systematically varies characteristics of the meta-analysis (\eg number of studies, between-study heterogeneity, and correlations) and parameters governing the missingness mechanism. Crossing these factors allows us to evaluate the performance of the ORB-adjustment method across a broad range of meta-analytic scenarios.
+
+To assess model misspecification, we vary 
+$\delta_{1,\text{sim}}$ and $\delta_{1,\text{est}}$ independently. This design distinguishes between scenarios where the selection model used for estimation matches the true data-generating mechanism    ($\delta_{1,\text{sim}}$ = $\delta_{1,\text{est}}$) and those where it differs ($\delta_{1,\text{sim}}$ $\neq$ $\delta_{1,\text{est}}$). Thereby, MAR (and MCAR) scenarios are included to evaluate the robustness of the ORB-adjustment method under alternative missingness mechanisms.
+
+Each simulation scenario is replicated $n_{\text{sim}}= 1900$ times to evaluate performance with adequate Monte Carlo precision. Within each replicate, the ORB-adjusted estimator uses $M=1000$ imputations to impute the unreported outcomes. Thus, $n_{sim}$ governs the number of repeated meta-analyses per scenario, while 
+$M$ controls the number of imputations within each analysis.
+
+Step 1, the simulation of the bivariate meta-analysis, involves $972$ scenarios and step 2, the simulation of ORB, leads to $42$ scenarios, which in total leads to $40824$ scenarios for the simulation study ($\delta_{1,\text{est}}$ is not included in the scenarios). 
+
+\begin{table}[]
+\captionsetup{justification=centering}
+\caption{Overview of investigated parameters in the simulation study.}
+\label{tab:SimStudy}
+\begin{adjustbox}{width=1\textwidth,center=\textwidth}
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Name}              & \textbf{Investigated values}  & \textbf{Description} \\ \hline
+$k$    & 6, 12, 25    & Number of studies in the meta-analysis.  \\ \hline
+$1 - p_1$  & \begin{tabular}[c]{@{}l@{}} 0\%, 20\%, 40\% \\\end{tabular} & \begin{tabular}[c]{@{}l@{}}Outcome-specific proportions of unreported study outcomes\\ are investigated to reflect unreporting for outcome 1.\end{tabular}      \\ \hline
+$\tau_j^2$    & 0, 0.02, 0.06, 0.36     & \begin{tabular}[c]{@{}l@{}}Between-study heterogeneity variances for outcomes $j = 1, 2$.\end{tabular}   \\ \hline
+$\theta_j$    & 0, 0.4, 0.8    & \begin{tabular}[c]{@{}l@{}}True overall treatment effect for each outcome $j = 1, 2$.\end{tabular}    \\ \hline
+$\rho_B$ & 0, 0.4, 0.8 & Between-study correlation.
+\\ \hline $\rho_W$  & \begin{tabular}[c]{@{}l@{}}
+0, 0.4, 0.8
+\end{tabular}    & Within-study correlation.  \\ \hline
+$\delta_{1,\text{sim}}$     & 0 - 1.3 in steps of 0.1    & \begin{tabular}[c]{@{}l@{}}Selection weight in simulation is varied to assess its\\ impact on the  adjusted estimates.\end{tabular}     \\ \hline
+$\delta_{1,\text{est}}$     & 0 - 1.3 in steps of 0.1    & \begin{tabular}[c]{@{}l@{}}Selection weight in estimation is varied to assess its\\ impact on the adjusted estimates.\end{tabular}     \\ \hline
+$M$    & 1000  & Number of simulations for imputing the unreported studies.    \\ \hline
+$n_{\text{sim}}$    & 1900  & Number of simulations for iterating over all scenarios.    \\ \hline
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\section{Estimands}
+
+Our primary estimand is the treatment effect size, derived from evidence pooled across multiple studies in the meta-analysis. This estimation is conducted using restricted maximum likelihood (REML), which maximizes a restricted likelihood function with respect to the variance components and then estimates the treatment effects conditionally \cite{mavridis2013practical}. We perform naive estimation, based on treatment effects solely from reported studies, complete data estimation, based on all studies before ORB is simulated, and estimation using our ORB-adjustment method. The statistical target of this simulation study is focused on estimation. Therefore, we aim to compare those three different estimation methods in terms of bias, MSE, and coverage probability (CP).
+
+\section{Methods}
+For a given parameter of interest $\theta$, we use REML to obtain its estimate using the \texttt{rma.mv()} function from the \texttt{metafor} package in R. REML estimation extends naturally to multivariate meta-analysis, where it jointly estimates the overall outcome-specific treatment effects $(\theta_1, \theta_2)$ and the between-study variance–covariance matrix. Each study contributes a bivariate effect vector $
+(\hat\nu_{i1}, \hat\nu_{i2})$ and a corresponding within-study covariance matrix 
+$\Sigma_i^{\text{within}}$.
+The within-study covariance matrix can be incorporated via the \texttt{V} argument of the \texttt{rma.mv()} function \cite{viechtbauer2010conducting}. REML estimation corrects for the downward bias in variance component estimates that occurs under standard maximum likelihood estimation (MLE) and is therefore preferred for random-effects meta-analysis \cite{mavridis2013practical}.
+Depending on the information, we compare the complete data estimation to the ORB-adjusted estimation. In the simulation study, we consider continuous outcomes for simplicity, whereas the real-data application in our manuscript involves binary outcomes which are analyzed on the log odds ratio scale or log relative risk scale. Using continuous outcomes simplifys computation and interpretation of performance metrics such as bias, MSE, and coverage. Importantly, in the simulation study, the outcomes serve solely as statistical quantities for evaluating estimator behavior, so no clinical or substantive interpretation of the simulated outcomes is intended.
+
+Regardless of outcome type, the core estimation framework remains the same: a bivariate random-effects meta-analysis model is used to obtain pooled estimates and between-study variance components. We compare three estimates: 
+\begin{compactenum}[(i)]
+  \item the naive estimate, \item the complete data estimate (as baseline),
+  \item the ORB-adjusted estimate.
+\end{compactenum}
+
+\subsection{Naive Estimate}
+
+The naive estimate is obtained by fitting the bivariate random-effects meta-analysis model to the subset of study outcomes that were reported. Specifically, only the observed (non-missing) outcomes are included in the analysis, and the model is fitted using REML to estimate the pooled treatment effects $\theta_j$ and between-study variances $\tau_j^2$ for $j=1,2$. 
+
+In practice, this corresponds to applying standard meta-analytic methods to the available data, ignoring the missing outcomes. The analysis implicitly assumes that missingness is unrelated to the unobserved outcomes and that the set of reported studies is representative of all studies. Under ORB, however, these assumptions are violated, leading to potential bias in the pooled effect estimates and underestimation of between-study variability \cite{copas2019model}.
+
+
+\subsection{Complete Data Estimate}
+The  complete  data  estimate  uses  all  studies  in the  meta-analysis  before  ORB  is  simulated. This estimator serves as a baseline for the true treatment effect in each scenario if there was no bias. 
+
+
+\subsection{ORB-adjusted Estimate}
+
+The adjusted estimate $\hat\theta_{\text{Adj}}$ for the current $\delta_{1,\text{est}}$ is given as
+\begin{equation} \label{eq:weightedAverage}
+\hat\theta_{\Adj} = \sum^{M}_{m = 1} w^{(m)} \cdot \hat\theta^{(m)}_{\MA} 
+\end{equation}
+where $\hat\theta^{(m)}_{\MA}$ is the combined estimate for each imputation $m$, $m = 1, ..., M$, based on a meta-analysis model. The meta-analysis used to compute  $\hat\theta^{(m)}_{\MA}$ consists of the reported study outcomes and the imputed study outcomes. The weights $w^{(m)}$ determine the contribution of each imputed meta-analytic estimate to the final adjusted estimate and depend on the specified selection weight $\delta_{1,\text{est}}$ and the corresponding imputed summary statistics (see our manuscript for methodological details). $\delta_{1,\text{est}}$ is the selection weight for outcome 1 used in the estimation step to explore the sensitivity of the ORB-adjustment method to assess the sensitivity of nonrandom selection. Setting $\delta_{1,\text{est}} = 0$ corresponds to a special MAR (and MCAR) case, implying that selection has no influence on inference.\\ 
+
+
+We perform this adjustment under both univariate and bivariate meta-analytic frameworks. In the univariate case, outcome 1 (the outcome where ORB was introduced) is analyzed by itself, ignoring cross-outcome correlations. In contrast, the bivariate ORB-adjusted model jointly analyzes both outcomes using the covariance structure specified in the within- and between-study matrices. This allows borrowing of strength from the fully reported outcome 2 to improve estimation of the selectively reported outcome 1. We want to compare these two adjusted estimators regarding the gain in precision and bias reduction attributable to modeling outcome correlation explicitly.
+
+Further methodological details on the ORB-adjusted estimator and its implementation can be found in our manuscript, where we also illustrate its use on real clinical data with binary outcomes. 
+
+
+\section{Performance Measures}
+
+The primary focus of the simulation study is estimation. Following the recommendations by Morris et al. \cite{morris2019using}, we evaluate the performance of the methods using repeated simulations and report bias, MSE, and CPs to assess simulation precision.  We let $n_{\text{sim}}$ denote the number of simulation replications.
+
+
+We derive the number of simulations needed based on the treatment effect and the required Monte Carlo standard error (MCSE), \eg 0.5\% \cite{inthout2014hartung, morris2019using}. Our primary performance measure is coverage of the 95\% confidence interval and so 
+\begin{equation*}
+    n_{\text{sim}} = \frac{\mathbb{E}(\text{Coverage}) \cdot (1-\mathbb{E}(\text{Coverage}))}{(\text{Required } \text{MCSE})^2} 
+     = \frac{0.95 \cdot 0.5}{0.005^2} = 1900.
+\end{equation*}
+
+The CP of the nominal 95\% confidence interval is defined as
+
+\begin{equation*}
+  \text{CP} = \frac{1}{n_{\text{sim}}} \sum_{r=1}^{n_{\text{sim}}} 
+  \mathbf{1}\!\left( \theta_{\text{low}}^{(r)} \leq \theta \leq \theta_{\text{up}}^{(r)} \right)
+\end{equation*}
+
+with MCSE is calculated as
+\begin{equation*}
+    \text{MCSE}(\text{CP}) = \sqrt{\frac{\text{CP} \left( 1 - \text{CP} \right)}{n_{\text{sim}}}}.
+\end{equation*} 
+
+
+Our secondary performance measures are:
+
+\begin{equation*}
+  \text{Bias} = \frac{1}{n_{\text{sim}}} \sum_{r=1}^{n_{\text{sim}}} \left(\hat{\theta}_{\text{Adj}}^{(r)} - \theta \right),
+\end{equation*}
+
+\begin{equation*}
+  \text{MSE} = \frac{1}{n_{\text{sim}}} \sum_{r=1}^{R_{\text{sim}}} \left(\hat{\theta}_{\text{Adj}}^{(r)} - \theta \right)^2.
+\end{equation*}
+
+
+MCSEs are computed for each performance measure to assess simulation uncertainty. 
+
+
+\section{Limitations and Sensitivity Analyses}
+
+As with any simulation study, several design choices may influence the generalizability of our findings. First, the data-generating mechanism assumes a logistic selection model for the MNAR mechanism, which is also used in the analysis model. This alignment may favor the ORB-adjustment method. To address this, we additionally include MAR scenarios to evaluate robustness under model misspecification. Because no observed covariates are included in the selection model, the MAR and MCAR scenarios coincide in our simulation setup. Alternative selection rules, such as two-sided selection, will not be explored here and may be considered in future work. For simplicity, we further assume that all trials have the same total sample size across studies. This homogeneity assumption reduces computational complexity and isolates the effects of between-study heterogeneity from variation due to differing study sizes. 
+
+Second, although we employ a full factorial design, the simulation study is a simplification and explores only a subset of all possible parameter combinations. The chosen ranges for the selection weight, between-study heterogeneity, and between-study correlation are intended to capture representative and practically relevant scenarios rather than exhaustively covering the entire parameter space. This approach reflects typical meta-analytic settings reported in the literature while maintaining computational feasibility.
+
+We assess the stability of our performance measures through $n_{\text{sim}} = 1900$ simulation replications per scenario, which ensures acceptable Monte Carlo error for bias, MSE, and coverage. MCSE for these quantities will be calculated and reported to evaluate the precision of the simulation results. 
+
+
+\section{Other}
+
+\subsection{Reproducibility}
+We will upload the simulation protocol to OSF and GitHub. The \href{https://github.com/cburgwin/Outcome-reporting-bias}{GitHub} repository will contain both the R scripts of the simulations, and the files used to obtain the PDF of the reports, including this protocol. To guarantee reproducibility, the random seed of the simulation will be set to \texttt{seed = 20251210}.
+
+
+\subsection{Statistical Software}
+
+All computations will be performed using R version 4.5.0. The simulations will be run in parallel using the \texttt{parallel} and \texttt{doParallel} R packages. The \texttt{foreach()} function from the \texttt{foreach} package is used to loop over the grid which contains all simulation scenarios. Further packages needed for the data-generating mechanism are \texttt{MASS}, \texttt{Matrix}, \texttt{mvtnorm} and \texttt{MCMCpack}.
+
+\subsection{Missingness}
+
+The functions and R scripts of the simulations process make use of the \texttt{tryCatch()} functionality to stop the simulation in case of an error, and record the results up until that point. We expect no missingness in the data-generating mechanism. It has been shown that two studies are needed to do a meta-analysis \cite{valentine2010many}, however, fitting bivariate random-effects meta-analysis models requires a minimum number of studies to reliably estimate the between-study variance–covariance structure. The Cochrane DTA Handbook notes that fewer than four studies typically do not support such models \cite{macaskill2010cochrane}. The only simulation scenario where we could have less than four studies after the introduction of ORB is for the naive estimate for $k = 6$ and $1-p_1 = 40\%$, \ie when we have 40\% unreported studies for outcome 1 and 6 studies in the meta-analysis and base the estimation only on the reported studies. In those case we have less than four reported studies for the naive estimate, we report \textit{NA}.
+
+To avoid running into convergence issues for the REML and resulting missingness in the statistical analysis, additional control parameters have been specified in the \texttt{rma()} and \texttt{rma.mv()} functions of the \texttt{metafor} package: the number of iterations has been increased to 1000 and the step length has been set to 0.1 for all simulation scenarios, \ie \texttt{control = list(stepadj = 0.1, maxiter = 1000)}. In some simulation replicates, model fitting may still fail due to convergence issues. We will repeat failed replicates until we obtain $n_{\text{sim}}$ successful replicates per scenario. This ensures that performance measures are computed on a fixed and comparable sample, reducing bias from arbitrary exclusions. We will also report whether missingness has occurred during the simulation study, following recommendations in the literature \cite{pawel2025handling, morris2019using}. 
+
+\subsection{Computational Environment}
+The simulations will be run on a Linux Server. A \texttt{sessionInfo()} output with more information on the
+R environment and code to reproduce the simulation study will be made available in the \href{https://github.com/cburgwin/Outcome-reporting-bias}{GitHub} repository.
+ 
+
+\clearpage
+\addcontentsline{toc}{section}{References}
+%\sloppy
+
+\bibliography{references}
+
+\end{document}
