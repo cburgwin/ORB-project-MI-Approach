@@ -1,0 +1,840 @@
+---
+title: "Simulation Study Plots"
+author: "Cora Burgwinkel"
+date: "2026-05-26"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+
+# load libaries
+library(dplyr)
+library(tidyr)
+library(tidyverse)
+library(ggplot2)
+library(readr)
+library(xtable)
+library(ggpubr)
+```
+
+# Plots Simulation Study
+
+
+
+##  theta1 = theta2 = 0.4, rho_B = 0.4, rho_W = 0.4, p_i = 0.2, n_sim = 1900, M = 200, delta_sim = delta_est
+
+
+read data in
+```{r, echo = FALSE, cache =TRUE}
+
+res_simstudy <- read.csv2("Data/data_simulation_S.csv", sep = ",")
+
+# turn data into long format for simulation parameters
+theta04_long <- res_simstudy %>%
+  pivot_longer(
+    cols = matches("^(Bias|MSE|Coverage|CI_Width)_"), 
+    names_to = c(".value", "method"),
+    names_pattern = "^(Bias|MSE|Coverage|CI_Width)_(.*)"
+  )
+
+
+# make sure all variables are numeric
+theta04_long <- theta04_long %>%
+  mutate(across(c(K, theta_1, theta_2, tau2_val, rho_b, rho_w, delta_sim, p1, delta_est,
+                  Avg_Redraws, Bias, MSE, Coverage, CI_Width, Failure_Rate, Avg_Redraws), as.numeric))
+
+# add I2 variable
+theta04_long <- theta04_long %>%
+  mutate(I2 = case_when(
+    tau2_val == 0.00 ~ "0",
+    tau2_val == 0.02 ~ "30",
+    tau2_val == 0.06 ~ "60",
+    tau2_val == 0.36 ~ "90",
+    TRUE             ~ NA_character_  # Catches any unexpected values safely
+  ))
+
+```
+
+plot bias
+
+```{r, echo = FALSE, fig.width=10, fig.height=10}
+theta04_long1 <- subset(theta04_long, select_type == "zscore")
+theta04_long2 <- subset(theta04_long, select_type == "effect")
+
+range(theta04_long1$Bias, theta04_long2$Bias, na.rm = TRUE)
+
+plot_A <- ggplot(theta04_long1, aes(x = delta_est, y = Bias, color = as.factor(method))) +
+  geom_line(aes(group = method), linewidth = 1.2) +
+   geom_hline(aes(yintercept = 0), color = "black", linetype = "dashed") +
+  facet_grid(I2 ~ K,
+           labeller = labeller(
+             K = as_labeller(function(x) paste0("K == ", x), 
+                               default = label_parsed),
+            I2 = as_labeller(function(x) paste0("I^2 == ", x, "*'%'"), 
+                                default = label_parsed) # or label_both if you want 'tau^2 = 0'
+           )) +
+  labs(x = expression("Selection Weight"~delta),
+       y = "Bias",
+       color = "Method type") +
+  scale_color_manual(name = " ",
+                     values = c("Naive_Biv" = "lightblue1", 
+                                "Adj_Biv" = "hotpink3", 
+                                 "Full" = "navy", 
+                                "Adj_Uni" = "thistle"),
+                      labels = c("Naive_Biv" = "Naive",
+                                 "Full" = "Complete Data",
+                                 "Adj_Biv" = "Bivariate",
+                                 "Adj_Uni" = "Univariate")) +
+  scale_x_continuous(breaks = seq(0, 1, by = 0.2)) +
+  scale_y_continuous(limits = c(-0.12, 0.22), breaks = seq(-0.1, 0.2, by = 0.1)) +
+  theme_minimal() +
+    theme(  
+      plot.margin = margin(20, 10, 10, 10),
+      plot.title = element_text(size = 16, hjust = 0.5), 
+      axis.title = element_text(size = 16), 
+      legend.position = "bottom",
+      strip.text.x = element_text(size = 16),
+      strip.text.y = element_text(size = 14, angle = 0, hjust = 0.5, vjust = 0.5),
+      legend.text = element_text(size = 16),
+      legend.title = element_text(size = 16))
+
+plot_B <-  ggplot(theta04_long2, aes(x = delta_est, y = Bias, color = as.factor(method))) +
+  geom_line(aes(group = method), linewidth = 1.2) +
+   geom_hline(aes(yintercept = 0), color = "black", linetype = "dashed") +
+   facet_grid(I2 ~ K,
+           labeller = labeller(
+             K = as_labeller(function(x) paste0("K == ", x),  
+                               default = label_parsed),
+            I2 = as_labeller(function(x) paste0("I^2 == ", x, "*'%'"), 
+                                default = label_parsed) # or label_both if you want 'tau^2 = 0'
+           )) +
+  labs(x = expression("Selection Weight"~delta),
+       y = "Bias",
+       color = "Method type") +
+    scale_color_manual(name = " ",
+                     values = c("Naive_Biv" = "lightblue1", 
+                                "Adj_Biv" = "hotpink3", 
+                                 "Full" = "navy", 
+                                "Adj_Uni" = "thistle"),
+                      labels = c("Naive_Biv" = "Naive",
+                                 "Full" = "Complete Data",
+                                 "Adj_Biv" = "Bivariate",
+                                 "Adj_Uni" = "Univariate")) +
+  scale_x_continuous(breaks = seq(0, 1, by = 0.2)) +
+  scale_y_continuous(limits = c(-0.12, 0.22), breaks = seq(-0.1, 0.2, by = 0.1)) +
+  theme_minimal() +
+    theme( 
+      plot.margin = margin(20, 10, 10, 10),
+      plot.title = element_text(size = 16, hjust = 0.5), 
+      axis.title = element_text(size = 16), 
+      legend.position = "bottom",
+      strip.text.x = element_text(size = 16),
+      strip.text.y = element_text(size = 14, angle = 0, hjust = 0.5, vjust = 0.5),
+      legend.text = element_text(size = 16),
+      legend.title = element_text(size = 16))
+
+ggarrange(
+  plot_A,
+  plot_B,
+  common.legend = TRUE,
+  legend = "bottom",
+  nrow = 2,
+  labels = c("A Selection on z-score", "B Selection on treatment effect"),
+  hjust = 0,
+  font.label = list(size = 16, face = "bold"),
+  label.y = 1.01,
+  heights = c(1, 1.1)
+)
+
+ggsave("Plots_Paper/SimStudy_Bias.png", width = 10, height = 10)
+```
+
+
+plot MSE
+
+```{r, echo = FALSE, fig.width=10, fig.height=10}
+
+plot_A <- ggplot(theta04_long1, aes(x = delta_est, y = MSE, color = as.factor(method))) +
+  geom_line(aes(group = method), linewidth = 1.2) +
+  facet_grid(I2 ~ K,
+           labeller = labeller(
+             K = as_labeller(function(x) paste0("K == ", x), 
+                               default = label_parsed),
+            I2 = as_labeller(function(x) paste0("I^2 == ", x, "*'%'"), 
+                                default = label_parsed) # or label_both if you want 'tau^2 = 0'
+           )) +
+  labs(x = expression("Selection Weight"~delta),
+       y = "MSE",
+       color = "Method type") +
+  scale_color_manual(name = " ",
+                     values = c("Naive_Biv" = "lightblue1", 
+                                "Adj_Biv" = "hotpink3", 
+                                 "Full" = "navy", 
+                                "Adj_Uni" = "thistle"),
+                      labels = c("Naive_Biv" = "Naive",
+                                 "Full" = "Complete Data",
+                                 "Adj_Biv" = "Bivariate",
+                                 "Adj_Uni" = "Univariate")) +
+  scale_x_continuous(breaks = seq(0, 1, by = 0.2)) +
+  theme_minimal() +
+    theme(  
+      plot.margin = margin(20, 10, 10, 10),
+      plot.title = element_text(size = 16, hjust = 0.5), 
+      axis.title = element_text(size = 16), 
+      legend.position = "bottom",
+      strip.text.x = element_text(size = 16),
+      strip.text.y = element_text(size = 14, angle = 0, hjust = 0.5, vjust = 0.5),
+      legend.text = element_text(size = 16),
+      legend.title = element_text(size = 16))
+
+plot_B <-  ggplot(theta04_long2, aes(x = delta_est, y = MSE, color = as.factor(method))) +
+  geom_line(aes(group = method), linewidth = 1.2) +
+   geom_hline(aes(yintercept = 0), color = "black", linetype = "dashed") +
+   facet_grid(I2 ~ K,
+           labeller = labeller(
+             K = as_labeller(function(x) paste0("K == ", x),  
+                               default = label_parsed),
+            I2 = as_labeller(function(x) paste0("I^2 == ", x, "*'%'"), 
+                                default = label_parsed) # or label_both if you want 'tau^2 = 0'
+           )) +
+  labs(x = expression("Selection Weight"~delta),
+       y = "MSE",
+       color = "Method type") +
+    scale_color_manual(name = " ",
+                     values = c("Naive_Biv" = "lightblue1", 
+                                "Adj_Biv" = "hotpink3", 
+                                 "Full" = "navy", 
+                                "Adj_Uni" = "thistle"),
+                      labels = c("Naive_Biv" = "Naive",
+                                 "Full" = "Complete Data",
+                                 "Adj_Biv" = "Bivariate",
+                                 "Adj_Uni" = "Univariate")) +
+  scale_x_continuous(breaks = seq(0, 1, by = 0.2)) +
+  theme_minimal() +
+    theme(  
+      plot.margin = margin(20, 10, 10, 10),
+      plot.title = element_text(size = 16, hjust = 0.5), 
+      axis.title = element_text(size = 16), 
+      legend.position = "bottom",
+      strip.text.x = element_text(size = 16),
+      strip.text.y = element_text(size = 14, angle = 0, hjust = 0.5, vjust = 0.5),
+      legend.text = element_text(size = 16),
+      legend.title = element_text(size = 16))
+
+ggarrange(
+  plot_A,
+  plot_B,
+  common.legend = TRUE,
+  legend = "bottom",
+  nrow = 2,
+  labels = c("A Selection on z-score", "B Selection on treatment effect"),
+  hjust = 0,
+  font.label = list(size = 16, face = "bold"),
+  label.y = 1.01,
+  heights = c(1, 1.1)
+)
+
+ggsave("Plots_Paper/SimStudy_MSE.png", width = 10, height = 10)
+```
+
+Coverage
+
+
+```{r, echo = FALSE, fig.width=10, fig.height=10}
+range(theta04_long1$Coverage, theta04_long2$Coverage, na.rm = TRUE)
+
+plot_A <- ggplot(theta04_long1, aes(x = delta_est, y = Coverage, color = as.factor(method))) +
+  geom_line(aes(group = method), linewidth = 1.2) +
+  geom_hline(aes(yintercept = 0.95), color = "black", linetype = "dashed") +
+  facet_grid(I2 ~ K,
+           labeller = labeller(
+             K = as_labeller(function(x) paste0("K == ", x), 
+                               default = label_parsed),
+            I2 = as_labeller(function(x) paste0("I^2 == ", x, "*'%'"), 
+                                default = label_parsed) # or label_both if you want 'tau^2 = 0'
+           )) +
+  labs(x = expression("Selection Weight"~delta),
+       y = "Coverage",
+       color = "Method type") +
+  scale_color_manual(name = " ",
+                     values = c("Naive_Biv" = "lightblue1", 
+                                "Adj_Biv" = "hotpink3", 
+                                 "Full" = "navy", 
+                                "Adj_Uni" = "thistle"),
+                      labels = c("Naive_Biv" = "Naive",
+                                 "Full" = "Complete Data",
+                                 "Adj_Biv" = "Bivariate",
+                                 "Adj_Uni" = "Univariate")) +
+  scale_x_continuous(breaks = seq(0, 1, by = 0.2)) +
+  scale_y_continuous(limits = c(0.7, 1), breaks = seq(0.7, 1, by = 0.1)) +
+  theme_minimal() +
+    theme(  
+      plot.margin = margin(20, 10, 10, 10),
+      plot.title = element_text(size = 16, hjust = 0.5), 
+      axis.title = element_text(size = 16), 
+      legend.position = "bottom",
+      strip.text.x = element_text(size = 16),
+      strip.text.y = element_text(size = 14, angle = 0, hjust = 0.5, vjust = 0.5),
+      legend.text = element_text(size = 16),
+      legend.title = element_text(size = 16))
+
+plot_B <-  ggplot(theta04_long2, aes(x = delta_est, y = Coverage, color = as.factor(method))) +
+  geom_line(aes(group = method), linewidth = 1.2) +
+  geom_hline(aes(yintercept = 0.95), color = "black", linetype = "dashed") +
+   facet_grid(I2 ~ K,
+           labeller = labeller(
+             K = as_labeller(function(x) paste0("K == ", x),  
+                               default = label_parsed),
+            I2 = as_labeller(function(x) paste0("I^2 == ", x, "*'%'"), 
+                                default = label_parsed) # or label_both if you want 'tau^2 = 0'
+           )) +
+  labs(x = expression("Selection Weight"~delta),
+       y = "Coverage",
+       color = "Method type") +
+    scale_color_manual(name = " ",
+                     values = c("Naive_Biv" = "lightblue1", 
+                                "Adj_Biv" = "hotpink3", 
+                                 "Full" = "navy", 
+                                "Adj_Uni" = "thistle"),
+                      labels = c("Naive_Biv" = "Naive",
+                                 "Full" = "Complete Data",
+                                 "Adj_Biv" = "Bivariate",
+                                 "Adj_Uni" = "Univariate")) +
+  scale_x_continuous(breaks = seq(0, 1, by = 0.2)) +
+  scale_y_continuous(limits = c(0.7, 1), breaks = seq(0.7, 1, by = 0.1)) +
+  theme_minimal() +
+    theme(  
+      plot.margin = margin(20, 10, 10, 10),
+      plot.title = element_text(size = 16, hjust = 0.5), 
+      axis.title = element_text(size = 16), 
+      legend.position = "bottom",
+      strip.text.x = element_text(size = 16),
+      strip.text.y = element_text(size = 14, angle = 0, hjust = 0.5, vjust = 0.5),
+      legend.text = element_text(size = 16),
+      legend.title = element_text(size = 16))
+
+ggarrange(
+  plot_A,
+  plot_B,
+  common.legend = TRUE,
+  legend = "bottom",
+  nrow = 2,
+  labels = c("A Selection on z-score", "B Selection on treatment effect"),
+  hjust = 0,
+  font.label = list(size = 16, face = "bold"),
+  label.y = 1.01,
+  heights = c(1, 1.1)
+)
+
+ggsave("Plots_Paper/SimStudy_Coverage.png", width = 10, height = 10)
+```
+
+CI width
+
+```{r, echo = FALSE, fig.width=10, fig.height=10}
+
+plot_A <- ggplot(theta04_long1, aes(x = delta_est, y = CI_Width, color = as.factor(method))) +
+  geom_line(aes(group = method), linewidth = 1.2) +
+  facet_grid(I2 ~ K,
+           labeller = labeller(
+             K = as_labeller(function(x) paste0("K == ", x), 
+                               default = label_parsed),
+            I2 = as_labeller(function(x) paste0("I^2 == ", x, "*'%'"), 
+                                default = label_parsed) # or label_both if you want 'tau^2 = 0'
+           )) +
+  labs(x = expression("Selection Weight"~delta),
+       y = "Confidence Interval Width",
+       color = "Method type") +
+  scale_color_manual(name = " ",
+                     values = c("Naive_Biv" = "lightblue1", 
+                                "Adj_Biv" = "hotpink3", 
+                                 "Full" = "navy", 
+                                "Adj_Uni" = "thistle"),
+                      labels = c("Naive_Biv" = "Naive",
+                                 "Full" = "Complete Data",
+                                 "Adj_Biv" = "Bivariate",
+                                 "Adj_Uni" = "Univariate")) +
+  scale_x_continuous(breaks = seq(0, 1, by = 0.2)) +
+  theme_minimal() +
+    theme(  
+      plot.margin = margin(20, 10, 10, 10),
+      plot.title = element_text(size = 16, hjust = 0.5), 
+      axis.title = element_text(size = 16), 
+      legend.position = "bottom",
+      strip.text.x = element_text(size = 16),
+      strip.text.y = element_text(size = 14, angle = 0, hjust = 0.5, vjust = 0.5),
+      legend.text = element_text(size = 16),
+      legend.title = element_text(size = 16))
+
+plot_B <-  ggplot(theta04_long2, aes(x = delta_est, y = CI_Width, color = as.factor(method))) +
+  geom_line(aes(group = method), linewidth = 1.2) +
+   facet_grid(I2 ~ K,
+           labeller = labeller(
+             K = as_labeller(function(x) paste0("K == ", x),  
+                               default = label_parsed),
+            I2 = as_labeller(function(x) paste0("I^2 == ", x, "*'%'"), 
+                                default = label_parsed) # or label_both if you want 'tau^2 = 0'
+           )) +
+  labs(x = expression("Selection Weight"~delta),
+       y = "Confidence Interval Width",
+       color = "Method type") +
+    scale_color_manual(name = " ",
+                     values = c("Naive_Biv" = "lightblue1", 
+                                "Adj_Biv" = "hotpink3", 
+                                 "Full" = "navy", 
+                                "Adj_Uni" = "thistle"),
+                      labels = c("Naive_Biv" = "Naive",
+                                 "Full" = "Complete Data",
+                                 "Adj_Biv" = "Bivariate",
+                                 "Adj_Uni" = "Univariate")) +
+  scale_x_continuous(breaks = seq(0, 1, by = 0.2)) +
+  theme_minimal() +
+    theme(  
+      plot.margin = margin(20, 10, 10, 10),
+      plot.title = element_text(size = 16, hjust = 0.5), 
+      axis.title = element_text(size = 16), 
+      legend.position = "bottom",
+      strip.text.x = element_text(size = 16),
+      strip.text.y = element_text(size = 14, angle = 0, hjust = 0.5, vjust = 0.5),
+      legend.text = element_text(size = 16),
+      legend.title = element_text(size = 16))
+  
+ggarrange(
+  plot_A,
+  plot_B,
+  common.legend = TRUE,
+  legend = "bottom",
+  nrow = 2,
+  labels = c("A Selection on z-score", "B Selection on treatment effect"),
+  hjust = 0,
+  font.label = list(size = 16, face = "bold"),
+  label.y = 1.01,
+  heights = c(1, 1.1)
+)
+
+ggsave("Plots_Paper/SimStudy_CIWidth.png", width = 10, height = 10)
+```
+
+
+### Analyse numerical stability parameters
+
+```{r}
+stability_summary <- theta04_long %>%
+  group_by(K, tau2_val, select_type) %>%
+  summarise(
+    Mean_Attempts = mean(N_Attempts),
+    Mean_Failure  = mean(Failure_Rate),
+    Mean_Redraws  = mean(Avg_Redraws)
+  )
+print(stability_summary)
+```
+
+##  theta1 = theta2 = 0.4, rho_B = 0.4, rho_W = 0.4, p_i = 0.2, n_sim = 1900, M = 200, delta_sim = 0.8
+
+
+```{r, echo = FALSE, cache =TRUE}
+res_simstudy_supp  <- read.csv2("Data/data_simulation_supp.csv", sep = ",")
+
+# turn data into long format for simulation parameters
+theta04_long <- res_simstudy_supp %>%
+  pivot_longer(
+    cols = matches("^(Bias|MSE|Coverage|CI_Width)_"), 
+    names_to = c(".value", "method"),
+    names_pattern = "^(Bias|MSE|Coverage|CI_Width)_(.*)"
+  )
+
+# make sure all variables are numeric
+theta04_long <- theta04_long %>%
+  mutate(across(c(K, theta_1, theta_2, tau2_val, rho_b, rho_w, delta_sim, p1, delta_est, Avg_Redraws, Bias, MSE, Coverage, CI_Width, Failure_Rate, Avg_Redraws), as.numeric))
+
+# add I2 variable
+theta04_long <- theta04_long %>%
+  mutate(I2 = case_when(
+    tau2_val == 0.00 ~ "0",
+    tau2_val == 0.02 ~ "30",
+    tau2_val == 0.06 ~ "60",
+    tau2_val == 0.36 ~ "90",
+    TRUE             ~ NA_character_  # Catches any unexpected values safely
+  ))
+
+```
+
+
+
+plot bias
+
+
+```{r, echo = FALSE, fig.width=10, fig.height=10}
+
+theta04_long1 <- subset(theta04_long, select_type == "zscore")
+theta04_long2 <- subset(theta04_long, select_type == "effect")
+
+range(theta04_long1$Bias, theta04_long2$Bias, na.rm = TRUE)
+
+plot_A <- ggplot(theta04_long1, aes(x = delta_est, y = Bias, color = as.factor(method))) +
+  geom_line(aes(group = method), linewidth = 1.2) +
+   geom_hline(aes(yintercept = 0), color = "black", linetype = "dashed") +
+  facet_grid(I2 ~ K,
+           labeller = labeller(
+             K = as_labeller(function(x) paste0("K == ", x), 
+                               default = label_parsed),
+            I2 = as_labeller(function(x) paste0("I^2 == ", x, "*'%'"), 
+                                default = label_parsed) # or label_both if you want 'tau^2 = 0'
+           )) +
+  labs(x = expression("Selection Weight"~delta),
+       y = "Bias",
+       color = "Method type") +
+  scale_color_manual(name = " ",
+                     values = c("Naive_Biv" = "lightblue1", 
+                                "Adj_Biv" = "hotpink3", 
+                                 "Full" = "navy", 
+                                "Adj_Uni" = "thistle"),
+                      labels = c("Naive_Biv" = "Naive",
+                                 "Full" = "Complete Data",
+                                 "Adj_Biv" = "Bivariate",
+                                 "Adj_Uni" = "Univariate")) +
+  scale_x_continuous(breaks = seq(0, 1, by = 0.2)) +
+  scale_y_continuous(limits = c(-0.15, 0.2), breaks = seq(-0.1, 0.2, by = 0.1)) +
+  theme_minimal() +
+    theme(  
+      plot.margin = margin(20, 10, 10, 10),
+      plot.title = element_text(size = 16, hjust = 0.5), 
+      axis.title = element_text(size = 16), 
+      legend.position = "bottom",
+      strip.text.x = element_text(size = 16),
+      strip.text.y = element_text(size = 14, angle = 0, hjust = 0.5, vjust = 0.5),
+      legend.text = element_text(size = 16),
+      legend.title = element_text(size = 16))
+
+plot_B <-  ggplot(theta04_long2, aes(x = delta_est, y = Bias, color = as.factor(method))) +
+  geom_line(aes(group = method), linewidth = 1.2) +
+   geom_hline(aes(yintercept = 0), color = "black", linetype = "dashed") +
+   facet_grid(I2 ~ K,
+           labeller = labeller(
+             K = as_labeller(function(x) paste0("K == ", x),  
+                               default = label_parsed),
+            I2 = as_labeller(function(x) paste0("I^2 == ", x, "*'%'"), 
+                                default = label_parsed) # or label_both if you want 'tau^2 = 0'
+           )) +
+  labs(x = expression("Selection Weight"~delta),
+       y = "Bias",
+       color = "Method type") +
+    scale_color_manual(name = " ",
+                     values = c("Naive_Biv" = "lightblue1", 
+                                "Adj_Biv" = "hotpink3", 
+                                 "Full" = "navy", 
+                                "Adj_Uni" = "thistle"),
+                      labels = c("Naive_Biv" = "Naive",
+                                 "Full" = "Complete Data",
+                                 "Adj_Biv" = "Bivariate",
+                                 "Adj_Uni" = "Univariate")) +
+  scale_x_continuous(breaks = seq(0, 1, by = 0.2)) +
+  scale_y_continuous(limits = c(-0.15, 0.2), breaks = seq(-0.1, 0.2, by = 0.1)) +
+  theme_minimal() +
+    theme( 
+      plot.margin = margin(20, 10, 10, 10),
+      plot.title = element_text(size = 16, hjust = 0.5), 
+      axis.title = element_text(size = 16), 
+      legend.position = "bottom",
+      strip.text.x = element_text(size = 16),
+      strip.text.y = element_text(size = 14, angle = 0, hjust = 0.5, vjust = 0.5),
+      legend.text = element_text(size = 16),
+      legend.title = element_text(size = 16))
+
+ggarrange(
+  plot_A,
+  plot_B,
+  common.legend = TRUE,
+  legend = "bottom",
+  nrow = 2,
+  labels = c("A Selection on z-score", "B Selection on treatment effect"),
+  hjust = 0,
+  font.label = list(size = 16, face = "bold"),
+  label.y = 1.01,
+  heights = c(1, 1.1)
+)
+
+ggsave("Plots_Paper/Supp_SimStudy_Bias.png", width = 10, height = 10)
+```
+
+
+plot MSE
+
+```{r, echo = FALSE, fig.width=10, fig.height=10}
+
+plot_A <- ggplot(theta04_long1, aes(x = delta_est, y = MSE, color = as.factor(method))) +
+  geom_line(aes(group = method), linewidth = 1.2) +
+  facet_grid(I2 ~ K,
+           labeller = labeller(
+             K = as_labeller(function(x) paste0("K == ", x), 
+                               default = label_parsed),
+            I2 = as_labeller(function(x) paste0("I^2 == ", x, "*'%'"), 
+                                default = label_parsed) # or label_both if you want 'tau^2 = 0'
+           )) +
+  labs(x = expression("Selection Weight"~delta),
+       y = "MSE",
+       color = "Method type") +
+  scale_color_manual(name = " ",
+                     values = c("Naive_Biv" = "lightblue1", 
+                                "Adj_Biv" = "hotpink3", 
+                                 "Full" = "navy", 
+                                "Adj_Uni" = "thistle"),
+                      labels = c("Naive_Biv" = "Naive",
+                                 "Full" = "Complete Data",
+                                 "Adj_Biv" = "Bivariate",
+                                 "Adj_Uni" = "Univariate")) +
+  scale_x_continuous(breaks = seq(0, 1, by = 0.2)) +
+  theme_minimal() +
+    theme(  
+      plot.margin = margin(20, 10, 10, 10),
+      plot.title = element_text(size = 16, hjust = 0.5), 
+      axis.title = element_text(size = 16), 
+      legend.position = "bottom",
+      strip.text.x = element_text(size = 16),
+      strip.text.y = element_text(size = 14, angle = 0, hjust = 0.5, vjust = 0.5),
+      legend.text = element_text(size = 16),
+      legend.title = element_text(size = 16))
+
+plot_B <-  ggplot(theta04_long2, aes(x = delta_est, y = MSE, color = as.factor(method))) +
+  geom_line(aes(group = method), linewidth = 1.2) +
+   facet_grid(I2 ~ K,
+           labeller = labeller(
+             K = as_labeller(function(x) paste0("K == ", x),  
+                               default = label_parsed),
+            I2 = as_labeller(function(x) paste0("I^2 == ", x, "*'%'"), 
+                                default = label_parsed) # or label_both if you want 'tau^2 = 0'
+           )) +
+  labs(x = expression("Selection Weight"~delta),
+       y = "MSE",
+       color = "Method type") +
+    scale_color_manual(name = " ",
+                     values = c("Naive_Biv" = "lightblue1", 
+                                "Adj_Biv" = "hotpink3", 
+                                 "Full" = "navy", 
+                                "Adj_Uni" = "thistle"),
+                      labels = c("Naive_Biv" = "Naive",
+                                 "Full" = "Complete Data",
+                                 "Adj_Biv" = "Bivariate",
+                                 "Adj_Uni" = "Univariate")) +
+  scale_x_continuous(breaks = seq(0, 1, by = 0.2)) +
+  scale_y_continuous(limits = c(0, 0.1), breaks = seq(0, 0.1, by = 0.025)) +
+  theme_minimal() +
+    theme(  
+      plot.margin = margin(20, 10, 10, 10),
+      plot.title = element_text(size = 16, hjust = 0.5), 
+      axis.title = element_text(size = 16), 
+      legend.position = "bottom",
+      strip.text.x = element_text(size = 16),
+      strip.text.y = element_text(size = 14, angle = 0, hjust = 0.5, vjust = 0.5),
+      legend.text = element_text(size = 16),
+      legend.title = element_text(size = 16))
+
+ggarrange(
+  plot_A,
+  plot_B,
+  common.legend = TRUE,
+  legend = "bottom",
+  nrow = 2,
+  labels = c("A Selection on z-score", "B Selection on treatment effect"),
+  hjust = 0,
+  font.label = list(size = 16, face = "bold"),
+  label.y = 1.01,
+  heights = c(1, 1.1)
+)
+
+ggsave("Plots_Paper/Supp_SimStudy_MSE.png", width = 10, height = 10)
+```
+
+Coverage
+
+
+```{r, echo = FALSE, fig.width=10, fig.height=10}
+range(theta04_long1$Coverage, theta04_long2$Coverage, na.rm = TRUE)
+
+
+plot_A <- ggplot(theta04_long1, aes(x = delta_est, y = Coverage, color = as.factor(method))) +
+  geom_line(aes(group = method), linewidth = 1.2) +
+  geom_hline(aes(yintercept = 0.95), color = "black", linetype = "dashed") +
+  facet_grid(I2 ~ K,
+           labeller = labeller(
+             K = as_labeller(function(x) paste0("K == ", x), 
+                               default = label_parsed),
+            I2 = as_labeller(function(x) paste0("I^2 == ", x, "*'%'"), 
+                                default = label_parsed) # or label_both if you want 'tau^2 = 0'
+           )) +
+  labs(x = expression("Selection Weight"~delta),
+       y = "Coverage",
+       color = "Method type") +
+  scale_color_manual(name = " ",
+                     values = c("Naive_Biv" = "lightblue1", 
+                                "Adj_Biv" = "hotpink3", 
+                                 "Full" = "navy", 
+                                "Adj_Uni" = "thistle"),
+                      labels = c("Naive_Biv" = "Naive",
+                                 "Full" = "Complete Data",
+                                 "Adj_Biv" = "Bivariate",
+                                 "Adj_Uni" = "Univariate")) +
+  scale_x_continuous(breaks = seq(0, 1, by = 0.2)) +
+  scale_y_continuous(limits = c(0.63, 1), breaks = seq(0.7, 1, by = 0.1)) +
+  theme_minimal() +
+    theme(  
+      plot.margin = margin(20, 10, 10, 10),
+      plot.title = element_text(size = 16, hjust = 0.5), 
+      axis.title = element_text(size = 16), 
+      legend.position = "bottom",
+      strip.text.x = element_text(size = 16),
+      strip.text.y = element_text(size = 14, angle = 0, hjust = 0.5, vjust = 0.5),
+      legend.text = element_text(size = 16),
+      legend.title = element_text(size = 16))
+
+plot_B <-  ggplot(theta04_long2, aes(x = delta_est, y = Coverage, color = as.factor(method))) +
+  geom_line(aes(group = method), linewidth = 1.2) +
+  geom_hline(aes(yintercept = 0.95), color = "black", linetype = "dashed") +
+   facet_grid(I2 ~ K,
+           labeller = labeller(
+             K = as_labeller(function(x) paste0("K == ", x),  
+                               default = label_parsed),
+            I2 = as_labeller(function(x) paste0("I^2 == ", x, "*'%'"), 
+                                default = label_parsed) # or label_both if you want 'tau^2 = 0'
+           )) +
+  labs(x = expression("Selection Weight"~delta),
+       y = "Coverage",
+       color = "Method type") +
+    scale_color_manual(name = " ",
+                     values = c("Naive_Biv" = "lightblue1", 
+                                "Adj_Biv" = "hotpink3", 
+                                 "Full" = "navy", 
+                                "Adj_Uni" = "thistle"),
+                      labels = c("Naive_Biv" = "Naive",
+                                 "Full" = "Complete Data",
+                                 "Adj_Biv" = "Bivariate",
+                                 "Adj_Uni" = "Univariate")) +
+  scale_x_continuous(breaks = seq(0, 1, by = 0.2)) +
+  scale_y_continuous(limits = c(0.63, 1), breaks = seq(0.7, 1, by = 0.1)) +
+  theme_minimal() +
+    theme(  
+      plot.margin = margin(20, 10, 10, 10),
+      plot.title = element_text(size = 16, hjust = 0.5), 
+      axis.title = element_text(size = 16), 
+      legend.position = "bottom",
+      strip.text.x = element_text(size = 16),
+      strip.text.y = element_text(size = 14, angle = 0, hjust = 0.5, vjust = 0.5),
+      legend.text = element_text(size = 16),
+      legend.title = element_text(size = 16))
+
+ggarrange(
+  plot_A,
+  plot_B,
+  common.legend = TRUE,
+  legend = "bottom",
+  nrow = 2,
+  labels = c("A Selection on z-score", "B Selection on treatment effect"),
+  hjust = 0,
+  font.label = list(size = 16, face = "bold"),
+  label.y = 1.01,
+  heights = c(1, 1.1)
+)
+
+ggsave("Plots_Paper/Supp_SimStudy_Coverage.png", width = 10, height = 10)
+```
+
+CI width
+
+```{r, echo = FALSE, fig.width=10, fig.height=10}
+
+plot_A <- ggplot(theta04_long1, aes(x = delta_est, y = CI_Width, color = as.factor(method))) +
+  geom_line(aes(group = method), linewidth = 1.2) +
+  facet_grid(I2 ~ K,
+           labeller = labeller(
+             K = as_labeller(function(x) paste0("K == ", x), 
+                               default = label_parsed),
+            I2 = as_labeller(function(x) paste0("I^2 == ", x, "*'%'"), 
+                                default = label_parsed) # or label_both if you want 'tau^2 = 0'
+           )) +
+  labs(x = expression("Selection Weight"~delta),
+       y = "Confidence Interval Width",
+       color = "Method type") +
+  scale_color_manual(name = " ",
+                     values = c("Naive_Biv" = "lightblue1", 
+                                "Adj_Biv" = "hotpink3", 
+                                 "Full" = "navy", 
+                                "Adj_Uni" = "thistle"),
+                      labels = c("Naive_Biv" = "Naive",
+                                 "Full" = "Complete Data",
+                                 "Adj_Biv" = "Bivariate",
+                                 "Adj_Uni" = "Univariate")) +
+  scale_x_continuous(breaks = seq(0, 1, by = 0.2)) +
+  theme_minimal() +
+    theme(  
+      plot.margin = margin(20, 10, 10, 10),
+      plot.title = element_text(size = 16, hjust = 0.5), 
+      axis.title = element_text(size = 16), 
+      legend.position = "bottom",
+      strip.text.x = element_text(size = 16),
+      strip.text.y = element_text(size = 14, angle = 0, hjust = 0.5, vjust = 0.5),
+      legend.text = element_text(size = 16),
+      legend.title = element_text(size = 16))
+
+plot_B <-  ggplot(theta04_long2, aes(x = delta_est, y = CI_Width, color = as.factor(method))) +
+  geom_line(aes(group = method), linewidth = 1.2) +
+   facet_grid(I2 ~ K,
+           labeller = labeller(
+             K = as_labeller(function(x) paste0("K == ", x),  
+                               default = label_parsed),
+            I2 = as_labeller(function(x) paste0("I^2 == ", x, "*'%'"), 
+                                default = label_parsed) # or label_both if you want 'tau^2 = 0'
+           )) +
+  labs(x = expression("Selection Weight"~delta),
+       y = "Confidence Interval Width",
+       color = "Method type") +
+    scale_color_manual(name = " ",
+                     values = c("Naive_Biv" = "lightblue1", 
+                                "Adj_Biv" = "hotpink3", 
+                                 "Full" = "navy", 
+                                "Adj_Uni" = "thistle"),
+                      labels = c("Naive_Biv" = "Naive",
+                                 "Full" = "Complete Data",
+                                 "Adj_Biv" = "Bivariate",
+                                 "Adj_Uni" = "Univariate")) +
+  scale_x_continuous(breaks = seq(0, 1, by = 0.2)) +
+  theme_minimal() +
+    theme(  
+      plot.margin = margin(20, 10, 10, 10),
+      plot.title = element_text(size = 16, hjust = 0.5), 
+      axis.title = element_text(size = 16), 
+      legend.position = "bottom",
+      strip.text.x = element_text(size = 16),
+      strip.text.y = element_text(size = 14, angle = 0, hjust = 0.5, vjust = 0.5),
+      legend.text = element_text(size = 16),
+      legend.title = element_text(size = 16))
+  
+ggarrange(
+  plot_A,
+  plot_B,
+  common.legend = TRUE,
+  legend = "bottom",
+  nrow = 2,
+  labels = c("A Selection on z-score", "B Selection on treatment effect"),
+  hjust = 0,
+  font.label = list(size = 16, face = "bold"),
+  label.y = 1.01,
+  heights = c(1, 1.1)
+)
+
+ggsave("Plots_Paper/Supp_SimStudy_CIWidth.png", width = 10, height = 10)
+```
+
+### Analyse numerical stability parameters
+
+```{r}
+stability_summary <- theta04_long %>%
+  group_by(K, tau2_val, select_type) %>%
+  summarise(
+    Mean_Attempts = mean(N_Attempts),
+    Mean_Failure  = mean(Failure_Rate),
+    Mean_Redraws  = mean(Avg_Redraws)
+  )
+print(stability_summary)
+```
+

@@ -1,17 +1,168 @@
 # Adjusting for Outcome Reporting Bias in Meta-analysis: A Multiple Imputation Approach
+[![arXiv](https://img.shields.io/badge/arXiv-2607.07509-b31b1b.svg)](https://arxiv.org/abs/2607.07509)
 
 ## Introduction
 Selective reporting of outcomes in clinical trial reports can be described as the reporting of a subset of the originally recorded outcome variables in the final report. Selective outcome reporting can create outcome reporting bias (ORB) when the decision to report results within published studies is influenced by the significance or direction of the results [^1]. Previous reviews showed that statistically significant outcomes were more likely to be fully reported than non-significant outcomes [^2]. ORB potentially undermines the credibility and validity of meta-analyses [^3] and contributes to research waste by distorting overall treatment effects [^4]. ORB can be viewed as a missing data problem where unreported outcomes introduce bias. Despite the serious implications ORB poses, it remains an underrecognized issue, with only a few adjustment methods available.
 
 ## Methods
-We propose an approach that addresses unreported outcomes in meta-analyses through multiple imputation. The imputed data are reweighted using importance sampling to pro-
-vide an adjusted estimate of the treatment effect, building on existing methods for selection bias from the literature [^5]. To assess the impact of ORB in meta-analyses of clinical trials, we apply our proposed methodology to real clinical data affected by ORB. We compare the imputation of unreported outcomes in the univariate meta-analysis to the multivariate meta-analysis. Additionally, we conduct a simulation study to evaluate the method’s performance, focusing on treatment effect estimation across varying degrees of selective non-reporting.
+We propose an approach that addresses unreported outcomes in meta-analyses through multiple imputation. The imputed data are reweighted using importance sampling to provide an adjusted estimate of the treatment effect, building on existing methods for selection bias from the literature [^5]. To assess the impact of ORB in meta-analyses of clinical trials, we apply our proposed methodology to real clinical data affected by ORB. We compare the imputation of unreported outcomes in the univariate meta-analysis to the multivariate meta-analysis. Additionally, we conduct a simulation study to evaluate the method’s performance, focusing on treatment effect estimation across varying degrees of selective non-reporting. The preprint is available on [arXiv](https://arxiv.org/abs/2607.07509).
 
 ## Repository Organization
-Below is a description of the different folders and their respective contents. This ORBproject repository contains the code and source files of the paper "Adjusting for Outcome Reporting Bias in Meta-analysis: a Multiple Imputation Approach". 
+Below is a description of the different folders and their respective contents. This ORBproject repository contains the code and source files of the paper "Adjusting for Outcome Reporting Bias in Meta-analysis: A Multiple Imputation Approach". 
 
 ### Paper Folder
-The folder contains the file ImpSimORB.Rnw file, which can be compiled in R, so as to obtain the ImpSimORB.pdf file, also included in this folder. The pdf file is the main file of the manuscript for this project, dynamically producing text, tables, and figures obtained from the analyses. The folder additionally includes the bibliography file references.bib, as well as the figures in the respective folder.
+The folder contains the file `main.tex` file, which can be compiled to obtain the final paper `ImpSimORB`.pdf file, also included in this folder. The pdf file is the main file of the manuscript for this project, producing text abd tables. Besides, the file `Appendix.tex` needs to be downloaded for the supplementary material. The folder additionally includes the bibliography file `references.bib` and `newCommands.tex`. The figures are in the respective folder `figures`.
+
+### Simulation Protocol Folder
+The folder contains the file `SimProtocol.Rnw` file, which can be compiled in R to obtain the `SimProtocol.pdf` file, also included in this folder. The outputted pdf file is the simulation protocol for this project, dynamically producing text, tables, and figures. This folder additionally includes the bibliography file `references.bib` and `newCommands.tex`, both are needed to compile `SimProtocol.Rnw`. The simulations conducted in the Simulation Folder, the results of which are used in the Paper Folder, are obtained following this pre-specified protocol. 
+
+### Code Folder
+This folder contains all functions used for the project.
+- `00.Functions.R` contains all functions necessary to implement our method:
+  1. `impute_missing_se()` imputes missing standard errors for one outcome at a time using the reported studies following the formula from Copas et al. [^6].
+  2. `run_univariate_imputation()` generates the imputed data using multiple imputation for one outcome under missing at random (MAR) assumption.
+  3.  `adj_univariate()` applies ORB importance sampling on the imputed datasets generated by `run_univariate_imputation()`.
+  4.  `run_bivariate_imputation()` generates the imputed data using multiple imputation for two outcomes jointly under MAR.
+  5.  `adj_bivariate()` applies ORB importance sampling on the imputed datasets generated by `run_bivariate_imputation()`.
+  6.  `generate_bivariate_ma()` simulates complete bivariate meta-analysis data.
+  7.  `impose_orb()` imposes ORB on outcome 1 from the simulated data generated with `generate_bivariate_ma()` and returns the data with ORB-induced missingness for outcome 1.
+- `01.Application_prep.R`creates the topiramate dataset `df_topiramate.rds` in the data folder.
+- `02.Application_fit.R` uses the data created with `01.Application_prep.R`, sources `00.Functions.R` and adjusts for ORB. It also produces `Table_2.rds` in data folder, which corresponds to table 2 in the paper.
+- `03.Application_Plots.Rmd` reads the datasets created with `02.Application_fit.R`, which are saved in the data folder, and creates all plots for the application.
+- `04.SimulationStudy.R` runs a loop over the functions in `00.Functions.R` for all considered scenarios in the simulation study.
+- `05.SimulationStudy_Plots.Rmd` reads the datasets created with `05.SimulationStudy.R`, which are saved in the data folder (`data_simulation_S.csv` and `data_simulation_supp.csv`) and creates all plots for the simulation study.
+
+### Data Folder
+This folder contains all data for the application as well as the simulation study.
+- `data_biv_df_S.csv` contains the data for the bivariate ORB adjustment of the real clinical data affected by ORB.
+- `data_uni_df_O1.csv` contains the data for univariate ORB adjustment for outcome 1 "50% seizure reduction" from the applicatio.
+- `data_uni_df_O2.csv` contains the data for univariate ORB adjustment for outcome 2 "seizure freedom" from the application.
+- `df_topiramate.rds` is created by file `01.Application_prep.R` and contains the real clinical data affected by ORB.
+- `Table_2.rds` is produced by file `02.Application_fit.R` and provides the results for the forest plot in the final paper.
+- `data_simulation_S.csv` contains the data from the simulation study for the plots in the main paper.
+- `data_simulation_supp.csv` contains the data from the simulation study for the supplementary material.
+
+## Reproducibility
+To ensure the reproducibility of this analysis, the computational environment details are provided below. 
+
+<details>
+<summary><b>Click to expand R Session Info for Simulation Study</b></summary>
+
+```r
+> sessionInfo()
+R version 4.5.0 (2025-04-11)
+Platform: x86_64-pc-linux-gnu
+Running under: Ubuntu 24.04.4 LTS
+
+Matrix products: default
+BLAS:   /usr/lib/x86_64-linux-gnu/openblas-pthread/libblas.so.3 
+LAPACK: /usr/lib/x86_64-linux-gnu/openblas-pthread/libopenblasp-r0.3.26.so;  LAPACK version 3.12.0
+
+Random number generation:
+ RNG:     L'Ecuyer-CMRG 
+ Normal:  Inversion 
+ Sample:  Rejection 
+ 
+locale:
+ [1] LC_CTYPE=en_US.UTF-8       LC_NUMERIC=C              
+ [3] LC_TIME=en_US.UTF-8        LC_COLLATE=en_US.UTF-8    
+ [5] LC_MONETARY=en_US.UTF-8    LC_MESSAGES=en_US.UTF-8   
+ [7] LC_PAPER=en_US.UTF-8       LC_NAME=C                 
+ [9] LC_ADDRESS=C               LC_TELEPHONE=C            
+[11] LC_MEASUREMENT=en_US.UTF-8 LC_IDENTIFICATION=C       
+
+time zone: Etc/UTC
+tzcode source: system (glibc)
+
+attached base packages:
+[1] stats     graphics  grDevices datasets  utils     methods   base     
+
+loaded via a namespace (and not attached):
+[1] compiler_4.5.0 bspm_0.5.5 
+```
+</details>
+
+<details>
+<summary><b>Click to expand R Session Info for Application</b></summary>
+  
+```r
+> sessionInfo()
+R version 4.5.2 (2025-10-31)
+Platform: x86_64-pc-linux-gnu
+Running under: Ubuntu 24.04.4 LTS
+
+Matrix products: default
+BLAS:   /usr/lib/x86_64-linux-gnu/blas/libblas.so.3.12.0 
+LAPACK: /usr/lib/x86_64-linux-gnu/lapack/liblapack.so.3.12.0  LAPACK version 3.12.0
+
+locale:
+ [1] LC_CTYPE=de_DE.UTF-8       LC_NUMERIC=C               LC_TIME=de_DE.UTF-8        LC_COLLATE=de_DE.UTF-8    
+ [5] LC_MONETARY=de_DE.UTF-8    LC_MESSAGES=de_DE.UTF-8    LC_PAPER=de_DE.UTF-8       LC_NAME=C                 
+ [9] LC_ADDRESS=C               LC_TELEPHONE=C             LC_MEASUREMENT=de_DE.UTF-8 LC_IDENTIFICATION=C       
+
+time zone: Europe/Berlin
+tzcode source: system (glibc)
+
+attached base packages:
+[1] stats     graphics  grDevices utils     datasets  methods   base     
+
+other attached packages:
+ [1] metafor_5.0-1       numDeriv_2016.8-1.1 metadat_1.6-0       Matrix_1.7-4        MASS_7.3-65        
+ [6] ggpubr_0.6.3        xtable_1.8-4        lubridate_1.9.5     forcats_1.0.1       stringr_1.6.0      
+[11] purrr_1.2.2         readr_2.1.5         tibble_3.3.1        ggplot2_4.0.3       tidyverse_2.0.0    
+[16] tidyr_1.3.2         dplyr_1.2.1        
+
+loaded via a namespace (and not attached):
+ [1] Rdpack_2.6.6             gridExtra_2.3            sandwich_3.1-1           rlang_1.2.0             
+ [5] magrittr_2.0.5           multcomp_1.4-30          otel_0.2.0               matrixStats_1.5.0       
+ [9] compiler_4.5.2           systemfonts_1.3.2        vctrs_0.7.3              reshape2_1.4.5          
+[13] pkgconfig_2.0.3          crayon_1.5.3             fastmap_1.2.0            backports_1.5.1         
+[17] labeling_0.4.3           rmarkdown_2.31           tzdb_0.5.0               nloptr_2.0.3            
+[21] ragg_1.5.2               bit_4.6.0                xfun_0.57                modeltools_0.2-24       
+[25] metabook_0.2-0           broom_1.0.13             parallel_4.5.2           R6_2.6.1                
+[29] coin_1.4-3               stringi_1.8.7            RColorBrewer_1.1-3       car_3.1-5               
+[33] boot_1.3-32              gsDesign_3.9.0           Rcpp_1.1.1-1.1           knitr_1.51              
+[37] zoo_1.8-15               confMeta_0.4.2           splines_4.5.2            timechange_0.4.0        
+[41] tidyselect_1.2.1         rstudioapi_0.18.0        dichromat_2.0-0.1        abind_1.4-8             
+[45] yaml_2.3.12              codetools_0.2-20         randomizeR_3.0.2         lattice_0.22-9          
+[49] plyr_1.8.9               withr_3.0.2              S7_0.2.2                 evaluate_1.0.5          
+[53] survival_3.8-6           CompQuadForm_1.4.4       xml2_1.3.6               pillar_1.11.1           
+[57] carData_3.0-5            rsconnect_1.8.0          stats4_4.5.2             reformulas_0.4.4        
+[61] insight_1.5.0            generics_0.1.4           vroom_1.7.1              mathjaxr_2.0-0          
+[65] hms_1.1.4                scales_1.4.0             minqa_1.2.8              glue_1.8.1              
+[69] tools_4.5.2              lme4_2.0-1               ggsignif_0.6.4           meta_8.3-0              
+[73] fs_1.6.6                 mvtnorm_1.3-7            cowplot_1.2.0            grid_4.5.2              
+[77] plotrix_3.8-14           rbibutils_2.4.1          libcoin_1.0-10           PwrGSD_2.3.8            
+[81] nlme_3.1-168             patchwork_1.3.2          ReplicationSuccess_1.3.3 Formula_1.2-5           
+[85] cli_3.6.6                r2rtf_1.3.0              textshaping_1.0.5        gt_1.3.0                
+[89] gtable_0.3.6             rstatix_0.7.2            digest_0.6.39            TH.data_1.1-5           
+[93] farver_2.1.2             htmltools_0.5.9          lifecycle_1.0.5          bit64_4.8.0      
+```
+</details>
+
+## Authors and acknowledgement
+Cora Burgwinkel, Saverio Fontana and Leonhard Held
+
+## Project status
+The manuscript has been submitted to the collection Reproducibility, transparency and open science at BMC Medical Research Methodology on 8th July 2026.
+
+## Citation
+Cite the preprint as 
+> Burgwinkel C, Fontana S, and Held L. Adjusting for Outcome Reporting Bias in Meta-analysis: A Multiple Imputation Approach. 2026. arXiv preprint: [arxiv:2607.07509](https://arxiv.org/abs/2607.07509).
+
+A BibTeX entry is given by
+
+```bibtex
+@misc{burgwinkel2026adjustingoutcomereportingbias,
+      title={Adjusting for Outcome Reporting Bias in Meta-analysis: A Multiple Imputation Approach}, 
+      author={Cora Burgwinkel and Saverio Fontana and Leonhard Held},
+      year={2026},
+      eprint={2607.07509},
+      archivePrefix={arXiv},
+      primaryClass={stat.ME},
+      url={https://arxiv.org/abs/2607.07509}, 
+}
+```
 
 [^1]: Cynthia MC Lemmens, Suzan van Amerongen, Eva M Strijbis, and Joep Killestein. Outcome reporting bias in clinical trials researching disease-modifying therapy in patients with multiple sclerosis. Neurology, 102(6):e208032, 2024. doi: https://doi.org/10.1212/WNL.0000000000208032.
 [^2]: Kerry Dwan, Carrol Gamble, Paula R Williamson, Jamie J Kirkham, and Reporting Bias Group. Systematic review of the empirical evidence of study publication bias and outcome
@@ -20,3 +171,4 @@ reporting bias—an updated review. PloS one, 8(7):e66844, 2013. doi: https://do
 [^4]: Elizabeth T Thomas and Carl Heneghan. Catalogue of bias: selective outcome reporting bias. BMJ Evidence-Based Medicine, 27(6):370–372, 2022. doi: https://doi.org/10.1136/
 bmjebm-2021-111845.
 [^5]: James Carpenter, Gerta Rücker, and Guido Schwarzer. Assessing the sensitivity of meta-analysis to selection bias: a multiple imputation approach. Biometrics, 67(3):1066–1072, 2011. doi: https://doi.org/10.1111/j.1541-0420.2010.01498.x
+[^6]: John Copas, Kerry Dwan, Jamie Kirkham, and Paula Williamson. A Model-based Correction for Outcome Reporting Bias in Meta-analysis. Biostatistics, 15(2):370–383, 2014. doi: https://doi.org/10.1093/biostatistics/kxt046

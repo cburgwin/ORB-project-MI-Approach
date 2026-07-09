@@ -1,0 +1,534 @@
+---
+title: "03.Application_plots.Rmd"
+author: "Cora Burgwinkel"
+date: "2026-05-21"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+# load libaries
+library(dplyr)
+library(tidyr)
+library(tidyverse)
+library(ggplot2)
+```
+
+# Plot Univariate for seizure reduction
+
+```{r, fig.width = 10, fig.height = 10}
+final_uni_df_O1 <- read.csv2("Data/data_uni_df_O1.csv", sep = ",")
+
+final_uni_df_O1 <- final_uni_df_O1 %>%
+  mutate(across(c(Selection, Estimate_adjusted, Estimate_unadjusted,
+                   CI_adjusted_lower, CI_adjusted_upper, Estimate_unadjusted,
+                  CI_unadjusted_lower, CI_unadjusted_upper), as.numeric))
+
+# plot the different z-scores for unadjusted and adjusted estimates
+ggplot(data = final_uni_df_O1, aes(x = as.numeric(Selection))) +
+  # Add ribbons for confidence intervals
+  geom_ribbon(aes(ymin = CI_adjusted_lower, ymax = CI_adjusted_upper, fill = "Adjusted CI"), alpha = 0.2) +
+  geom_ribbon(aes(ymin = CI_unadjusted_lower, ymax = CI_unadjusted_upper, fill = "Unadjusted CI"), alpha = 0.1) +
+  # Add adjusted estimate line and point
+  geom_line(aes(y = Estimate_adjusted, color = "Adjusted Estimate"), linewidth = 1) +
+  geom_point(aes(y = Estimate_adjusted, color = "Adjusted Estimate"), size = 2) +
+  # Add unadjusted estimate line
+  geom_line(aes(y = Estimate_unadjusted, color = "Naive Estimate"),
+            linetype = "dashed", linewidth = 1) +
+  # Facet by z_score and effect_estimate
+  facet_grid(Z_score ~ Measure,
+             labeller = labeller(Measure = c("log OR" = "Effect Estimate: Odds Ratio (OR)",
+                                                     "log RR" = "Effect Estimate: Relative Risk (RR)"),
+                                 Z_score = c("TRUE" = "Selection on Z-score",
+                                             "FALSE" = "Selection on log OR/log RR"))) +
+  # Define scales for colors and fill
+  scale_color_manual(name = " ",
+                     values = c("Adjusted Estimate" = "blue", "Naive Estimate" = "red")) +
+  scale_fill_manual(name = "Confidence Interval",
+                    values = c("Adjusted CI" = "blue", "Unadjusted CI" = "red"),
+                    guide = "none") +
+  # Add labels and theme adjustments
+  labs(x = expression("Selection Weight"~delta), y = "Overall Summary Estimate") +
+  theme_minimal() +
+  theme(legend.position = "bottom",
+        axis.title.x = element_text(size = 16),
+        axis.title.y = element_text(size = 16),
+        legend.text = element_text(size = 16),
+        legend.title = element_text(size = 16),
+        strip.text = element_text(size = 16))
+
+ggsave("Plots_Paper/App_Uni_REM_O1.png", width = 10, height = 10)
+```
+
+
+# Plot Univariate for seizure freedom
+
+```{r, fig.width = 10, fig.height = 10}
+final_uni_df_O2 <- read.csv2("data/data_uni_df_O2.csv", sep = ",")
+
+final_uni_df_O2 <- final_uni_df_O2 %>%
+  mutate(across(c(Estimate_adjusted, Estimate_unadjusted,
+                   CI_adjusted_lower, CI_adjusted_upper, Estimate_unadjusted,
+                  CI_unadjusted_lower, CI_unadjusted_upper), as.numeric))
+
+# plot the different z-scores for unadjusted and adjusted estimates
+ggplot(data = final_uni_df_O2, aes(x = as.numeric(Selection))) +
+  # Add ribbons for confidence intervals
+  geom_ribbon(aes(ymin = CI_adjusted_lower, ymax = CI_adjusted_upper, fill = "Adjusted CI"), alpha = 0.2) +
+  geom_ribbon(aes(ymin = CI_unadjusted_lower, ymax = CI_unadjusted_upper, fill = "Unadjusted CI"), alpha = 0.1) +
+  # Add adjusted estimate line and point
+  geom_line(aes(y = Estimate_adjusted, color = "Adjusted Estimate"), linewidth = 1) +
+  geom_point(aes(y = Estimate_adjusted, color = "Adjusted Estimate"), size = 2) +
+  # Add unadjusted estimate line
+  geom_line(aes(y = Estimate_unadjusted, color = "Naive Estimate"),
+            linetype = "dashed", linewidth = 1) +
+  # Facet by z_score and effect_estimate
+  facet_grid(Z_score ~ Effect_estimate,
+             labeller = labeller(Effect_estimate = c("odds_ratio" = "Effect Estimate: Odds Ratio (OR)",
+                                                     "relative_risk" = "Effect Estimate: Relative Risk (RR)"),
+                                 Z_score = c("TRUE" = "Selection on Z-score",
+                                             "FALSE" = "Selection on log OR/log RR"))) +
+  # Define scales for colors and fill
+  scale_color_manual(name = " ",
+                     values = c("Adjusted Estimate" = "blue", "Naive Estimate" = "red")) +
+  scale_fill_manual(name = "Confidence Interval",
+                    values = c("Adjusted CI" = "blue", "Unadjusted CI" = "red"),
+                    guide = "none") +
+  # Add labels and theme adjustments
+  labs(x = expression("Selection Weight"~delta), y = "Overall Summary Estimate") +
+  theme_minimal() +
+  theme(legend.position = "bottom",
+        axis.title.x = element_text(size = 16),
+        axis.title.y = element_text(size = 16),
+        legend.text = element_text(size = 16),
+        legend.title = element_text(size = 16),
+        strip.text = element_text(size = 16))
+
+ggsave("Plots_Paper/App_Uni_REM_O2.png", width = 10, height = 10)
+```
+
+
+# Plot Comparison of Correlations
+## for 50% Seizure Reduction
+
+```{r, fig.width = 10, fig.height = 10}
+
+plot_biv_df <- read.csv2("Data/data_biv_df_S.csv", sep = ",")
+
+# only plot outcome two
+plot_biv_df_O1 <- subset(plot_biv_df, Outcome == "O1")
+
+# bring data into wide format
+naive_df_O1 <- plot_biv_df_O1 %>%
+ filter(Approach == "Naive estimate") %>%
+ dplyr::select(Outcome, Measure, Selection, Correlation,
+        Estimate_unadjusted = Estimate,
+        CI_unadjusted_lower = CI_Lower,
+        CI_unadjusted_upper = CI_Upper)
+ 
+adjusted_df_O1 <- plot_biv_df_O1 %>%
+ filter(Approach != "Naive estimate") %>%
+ # Create the Z_score column your plot expects (TRUE if zscore, FALSE if effect)
+ mutate(Z_score = ifelse(Approach == "Bivariate Selection on zscore", TRUE, FALSE)) %>%
+ dplyr::select(Outcome, Measure, Selection, Z_score, Correlation,
+        Estimate_adjusted = Estimate, 
+        CI_adjusted_lower = CI_Lower, 
+        CI_adjusted_upper = CI_Upper)
+ 
+final_biv_df_O1 <- adjusted_df_O1 %>%
+ left_join(naive_df_O1, by = c("Selection", "Measure", "Correlation", "Outcome")) 
+
+# plot all correlations together
+ 
+# rename correlations
+final_biv_df_O1$Correlation[final_biv_df_O1$Correlation == "studyspecific"] <- "Study-specific"
+final_biv_df_O1$Correlation[final_biv_df_O1$Correlation == "estimated"] <- "Global"
+
+# factor correlation such that it is depicted in the correct order in the legend
+final_biv_df_O1$Correlation <- factor(
+  final_biv_df_O1$Correlation, 
+  levels = c("-0.9", "-0.6", "-0.3", "0", "0.3", "0.6", "0.67", "Global", "Study-specific"))
+
+# plot correlation over different colors
+ggplot(data = final_biv_df_O1, aes(x = as.numeric(Selection))) +
+   # Adjusted estimates: color by Correlation
+  geom_line(aes(y = as.numeric(Estimate_adjusted), color = Correlation),
+           linewidth = 1, linetype = "solid") +
+  geom_point(aes(y = as.numeric(Estimate_adjusted), color = Correlation,
+            shape = Correlation), size = 2) +
+    # Facets
+   facet_grid(Z_score ~ Measure,
+              labeller = labeller(Measure = c("log OR" = "Effect Estimate: Odds Ratio (OR)",
+                                              "log RR" = "Effect Estimate: Relative Risk (RR)"),
+                                  Z_score = c("TRUE" = "Selection on Z-score",
+                                              "FALSE" = "Selection on log OR/log RR"))) +
+     # Manual scales
+    scale_color_manual(name = "Correlation",
+                      values = c("-0.9" = "lightblue", "-0.6" = "#92C5DE",
+                                 "-0.3" = "#4393C3", "0" = "cornflowerblue",
+                                 "0.3" = "#2166AC", "0.6" = "skyblue4", "0.67" = "#03045E",
+                                 "Study-specific" = "red", "Global" = "forestgreen")) +
+    scale_shape_manual(name = "Correlation",
+                      values = c("-0.9" = 16, "-0.6" = 17, "-0.3" = 18,
+                                 "0" = 19, "0.3" = 20, "0.6" = 0, "0.67" = 5,
+                                 "Study-specific" = 21, "Global" = 22)) +
+    # Labels and theme
+    labs(x = expression("Selection Weight"~delta), y = "Overall Summary Measure") +
+    theme_minimal() +
+    theme(legend.position = "bottom",
+         panel.spacing.x = unit(1, "cm"),
+         panel.spacing.y = unit(1, "lines"),
+         axis.title.x = element_text(size = 16),
+         axis.title.y = element_text(size = 16),
+         legend.text = element_text(size = 16),
+         legend.title = element_text(size = 16),
+         strip.text = element_text(size = 16)) 
+
+ggsave("Plots_Paper/App_Corr_12_mv_REM_O1.png", width = 10, height = 10)
+
+```
+
+## for Seizure Freedom
+
+```{r, fig.width = 10, fig.height = 10}
+
+plot_biv_df <- read.csv2("data/data_biv_df_S.csv", sep = ",")
+
+# only plot outcome two
+plot_biv_df <- subset(plot_biv_df, Outcome == "O2")
+
+# bring data into wide format
+naive_df <- plot_biv_df %>%
+ filter(Approach == "Naive estimate") %>%
+ dplyr::select(Outcome, Measure, Selection, Correlation,
+        Estimate_unadjusted = Estimate,
+        CI_unadjusted_lower = CI_Lower,
+        CI_unadjusted_upper = CI_Upper)
+ 
+adjusted_df <- plot_biv_df %>%
+ filter(Approach != "Naive estimate") %>%
+ # Create the Z_score column your plot expects (TRUE if zscore, FALSE if effect)
+ mutate(Z_score = ifelse(Approach == "Bivariate Selection on zscore", TRUE, FALSE)) %>%
+ dplyr::select(Outcome, Measure, Selection, Z_score, Correlation,
+        Estimate_adjusted = Estimate, 
+        CI_adjusted_lower = CI_Lower, 
+        CI_adjusted_upper = CI_Upper)
+ 
+final_biv_df <- adjusted_df %>%
+ left_join(naive_df, by = c("Selection", "Measure", "Correlation", "Outcome")) 
+
+# plot all correlations together
+ 
+# rename correlations
+final_biv_df$Correlation[final_biv_df$Correlation == "studyspecific"] <- "Study-specific"
+final_biv_df$Correlation[final_biv_df$Correlation == "estimated"] <- "Global"
+
+# factor correlation such that it is depicted in the correct order in the legend
+final_biv_df$Correlation <- factor(
+  final_biv_df$Correlation, 
+  levels = c("-0.9", "-0.6", "-0.3", "0", "0.3", "0.6", "0.67", "Global", "Study-specific"))
+
+
+# plot correlation over different colors
+ggplot(data = final_biv_df, aes(x = as.numeric(Selection))) +
+   # Adjusted estimates: color by Correlation
+  geom_line(aes(y = as.numeric(Estimate_adjusted), color = Correlation),
+           linewidth = 1, linetype = "solid") +
+  geom_point(aes(y = as.numeric(Estimate_adjusted), color = Correlation,
+            shape = Correlation), size = 2) +
+    # Facets
+   facet_grid(Z_score ~ Measure,
+              labeller = labeller(Measure = c("log OR" = "Effect Estimate: Odds Ratio (OR)",
+                                              "log RR" = "Effect Estimate: Relative Risk (RR)"),
+                                  Z_score = c("TRUE" = "Selection on Z-score",
+                                              "FALSE" = "Selection on log OR/log RR"))) +
+     # Manual scales
+     scale_color_manual(name = "Correlation",
+                      values = c("-0.9" = "lightblue", "-0.6" = "#92C5DE",
+                                 "-0.3" = "#4393C3", "0" = "cornflowerblue",
+                                 "0.3" = "#2166AC", "0.6" = "skyblue4", "0.67" = "#03045E",
+                                 "Study-specific" = "red", "Global" = "forestgreen")) +
+     scale_shape_manual(name = "Correlation",
+                      values = c("-0.9" = 16, "-0.6" = 17, "-0.3" = 18,
+                                 "0" = 19, "0.3" = 20, "0.6" = 0, "0.67" = 5,
+                                 "Study-specific" = 21, "Global" = 22)) +
+    # Labels and theme
+    labs(x = expression("Selection Weight"~delta), y = "Overall Summary Measure") +
+    theme_minimal() +
+    theme(legend.position = "bottom",
+         panel.spacing.x = unit(1, "cm"),
+         panel.spacing.y = unit(1, "lines"),
+         axis.title.x = element_text(size = 16),
+         axis.title.y = element_text(size = 16),
+         legend.text = element_text(size = 16),
+         legend.title = element_text(size = 16),
+         strip.text = element_text(size = 16))
+
+ggsave("Plots_Paper/App_Corr_12_mv_REM_O2.png", width = 10, height = 10)
+```
+
+# Plot Univariate and Multivariate for comparison for seizure reduction
+## within-study correlation of 0.5
+
+```{r, fig.width = 10, fig.height = 10}
+
+#data set for univariate
+uni <- final_uni_df_O1 %>%
+  dplyr::select(Z_score, Selection, Measure,
+                Estimate_adjusted_uni = Estimate_adjusted,
+                Estimate_unadjusted_uni = Estimate_unadjusted,
+                CI_adjusted_low_uni = CI_adjusted_lower,
+                CI_adjusted_up_uni = CI_adjusted_upper)
+
+uni$Selection <- as.numeric(uni$Selection)
+final_biv_df_O1$Selection <- as.numeric(final_biv_df_O1$Selection)
+
+# select correlation
+final_biv_df_O1 <- subset(final_biv_df_O1, Correlation == -0.3)
+
+# merge with bivariate data
+plotdf <- final_biv_df_O1 %>%
+  dplyr::select(Z_score, Selection, Measure,
+                Estimate_adjusted, Estimate_unadjusted,
+                CI_adjusted_lower, CI_adjusted_upper) %>%
+  left_join(uni, by = c("Measure", "Z_score","Selection"))
+
+# make sure estimates are numerical
+plotdf <- plotdf %>%
+  mutate(across(c(Estimate_adjusted, Estimate_unadjusted,
+                   CI_adjusted_lower, CI_adjusted_upper,
+                  Estimate_adjusted_uni, Estimate_unadjusted_uni,
+                  CI_adjusted_low_uni, CI_adjusted_up_uni), as.numeric))
+
+
+# Create the ggplot
+ggplot(data = plotdf, aes(x = as.numeric(Selection))) +
+  # Add ribbons for confidence intervals
+  geom_ribbon(aes(ymin = as.numeric(CI_adjusted_low_uni), ymax = as.numeric(CI_adjusted_up_uni), fill = "Adjusted CI Univariate"), alpha = 0.2) +
+  geom_ribbon(aes(ymin = CI_adjusted_lower, ymax = CI_adjusted_upper, fill = "Adjusted CI Bivariate"), alpha = 0.1) +
+  # Add adjusted estimate line and point
+  geom_line(aes(y = as.numeric(Estimate_adjusted), color = "Adjusted - Bivariate"), linewidth = 1) +
+  geom_line(aes(y = as.numeric(Estimate_adjusted_uni), color = "Adjusted - Univariate"), linewidth = 1) +
+  geom_point(aes(y = as.numeric(Estimate_adjusted), color = "Adjusted - Bivariate"), size = 2) +
+  geom_point(aes(y = as.numeric(Estimate_adjusted_uni), color = "Adjusted - Univariate"), size = 2) +
+  # Add unadjusted estimate line
+  geom_line(aes(y = as.numeric(Estimate_unadjusted), color = "Naive - Bivariate"), linetype = "dashed", linewidth = 1) +
+  geom_line(aes(y = as.numeric(Estimate_unadjusted_uni), color = "Naive - Univariate"), linetype = "dashed", linewidth = 1) +
+  # Facet by z_score and effect_estimate
+  facet_grid(Z_score ~ Measure,
+             labeller = labeller(Measure = c("log OR" = "Effect Estimate: Odds Ratio (OR)",
+                                             "log RR" = "Effect Estimate: Relative Risk (RR)"),
+                                 Z_score = c("TRUE" = "Selection on Z-score",
+                                             "FALSE" = "Selection on log OR/log RR"))) +
+  # Define scales for colors and fill
+  scale_color_manual(name = " ",
+                     values = c("Adjusted - Univariate" = "blue",
+                                "Adjusted - Bivariate" = "#009E73",
+                                "Naive - Bivariate" = "#009E73",
+                                "Naive - Univariate" = "blue")) +
+  scale_fill_manual(name = "Confidence Interval",
+                    values = c("Adjusted CI Univariate" = "blue",
+                               "Adjusted CI Bivariate" = "#009E73"),
+                    guide = "none") +
+  # Add labels and theme adjustments
+  labs(x = expression("Selection Weight"~delta), y = "Overall Summary Measure") +
+  theme_minimal() +
+  theme(legend.position = "bottom",
+        panel.spacing.x = unit(1, "cm"),
+        axis.title.x = element_text(size = 16),
+        axis.title.y = element_text(size = 16),
+        legend.text = element_text(size = 16),
+        legend.title = element_text(size = 16),
+        strip.text = element_text(size = 16))
+
+ggsave("Plots_Paper/Uni_Multi_Comp_12_REM_05_01.png", width = 10, height = 10)
+```
+
+
+# Plot Univariate and Multivariate for comparison for seizure freedom
+## within-study correlation of 0.5
+
+```{r, fig.width = 10, fig.height = 10}
+
+#data set for univariate
+uni <- final_uni_df_O2 %>%
+  dplyr::select(Z_score, Selection, Measure,
+                Estimate_adjusted_uni = Estimate_adjusted,
+                Estimate_unadjusted_uni = Estimate_unadjusted,
+                CI_adjusted_low_uni = CI_adjusted_lower,
+                CI_adjusted_up_uni = CI_adjusted_upper)
+
+uni$Selection <- as.numeric(uni$Selection)
+final_biv_df$Selection <- as.numeric(final_biv_df$Selection)
+
+# select correlation
+final_biv_df1 <- subset(final_biv_df, Correlation == -0.3)
+
+# merge with bivariate data
+plotdf <- final_biv_df1 %>%
+  dplyr::select(Z_score, Selection, Measure,
+                Estimate_adjusted, Estimate_unadjusted,
+                CI_adjusted_lower, CI_adjusted_upper) %>%
+  left_join(uni, by = c("Measure", "Z_score","Selection"))
+
+# make sure estimates are numerical
+plotdf <- plotdf %>%
+  mutate(across(c(Estimate_adjusted, Estimate_unadjusted,
+                   CI_adjusted_lower, CI_adjusted_upper,
+                  Estimate_adjusted_uni, Estimate_unadjusted_uni,
+                  CI_adjusted_low_uni, CI_adjusted_up_uni), as.numeric))
+
+
+# Create the ggplot
+ggplot(data = plotdf, aes(x = as.numeric(Selection))) +
+  # Add ribbons for confidence intervals
+  geom_ribbon(aes(ymin = as.numeric(CI_adjusted_low_uni), ymax = as.numeric(CI_adjusted_up_uni), fill = "Adjusted CI Univariate"), alpha = 0.2) +
+  geom_ribbon(aes(ymin = CI_adjusted_lower, ymax = CI_adjusted_upper, fill = "Adjusted CI Bivariate"), alpha = 0.1) +
+  # Add adjusted estimate line and point
+  geom_line(aes(y = as.numeric(Estimate_adjusted), color = "Adjusted - Bivariate"), linewidth = 1) +
+  geom_line(aes(y = as.numeric(Estimate_adjusted_uni), color = "Adjusted - Univariate"), linewidth = 1) +
+  geom_point(aes(y = as.numeric(Estimate_adjusted), color = "Adjusted - Bivariate"), size = 2) +
+  geom_point(aes(y = as.numeric(Estimate_adjusted_uni), color = "Adjusted - Univariate"), size = 2) +
+  # Add unadjusted estimate line
+  geom_line(aes(y = as.numeric(Estimate_unadjusted), color = "Naive - Bivariate"), linetype = "dashed", linewidth = 1) +
+  geom_line(aes(y = as.numeric(Estimate_unadjusted_uni), color = "Naive - Univariate"), linetype = "dashed", linewidth = 1) +
+  # Facet by z_score and effect_estimate
+  facet_grid(Z_score ~ Measure,
+             labeller = labeller(Measure = c("log OR" = "Effect Estimate: Odds Ratio (OR)",
+                                             "log RR" = "Effect Estimate: Relative Risk (RR)"),
+                                 Z_score = c("TRUE" = "Selection on Z-score",
+                                             "FALSE" = "Selection on log OR/log RR"))) +
+  # Define scales for colors and fill
+  scale_color_manual(name = " ",
+                     values = c("Adjusted - Univariate" = "blue",
+                                "Adjusted - Bivariate" = "#009E73",
+                                "Naive - Bivariate" = "#009E73",
+                                "Naive - Univariate" = "blue")) +
+  scale_fill_manual(name = "Confidence Interval",
+                    values = c("Adjusted CI Univariate" = "blue",
+                               "Adjusted CI Bivariate" = "#009E73"),
+                    guide = "none") +
+  # Add labels and theme adjustments
+  labs(x = expression("Selection Weight"~delta), y = "Overall Summary Measure") +
+  theme_minimal() +
+  theme(legend.position = "bottom",
+        panel.spacing.x = unit(1, "cm"),
+        axis.title.x = element_text(size = 16),
+        axis.title.y = element_text(size = 16),
+        legend.text = element_text(size = 16),
+        legend.title = element_text(size = 16),
+        strip.text = element_text(size = 16))
+
+ggsave("Plots_Paper/Uni_Multi_Comp_12_REM_05.png", width = 10, height = 10)
+```
+
+## create forest plot
+
+```{r}
+# read data in from Table_2.rds
+data <- readRDS("data/Table_2.rds")
+
+# transform data to plot them as forest plot
+dat <- data %>%
+  # Standardize Approach names 
+  mutate(
+    Approach = case_when(
+      Approach == "Selection on effect" ~ "Selection on effect estimate",
+      Approach == "Selection on zscore" ~ "Selection on z-score",
+      Approach == "Bivariate Selection on effect" ~ "Selection on effect estimate",
+      Approach == "Bivariate Selection on zscore" ~ "Selection on z-score",
+      TRUE ~ Approach
+    ),
+    #  Re-format the Model column
+    Model = if_else(Correlation == "Univariate", "Univariate", paste0("Bivariate (", Correlation, ")")),
+    # Clean up the Measure column
+    Effect = str_remove(Measure, "log ")
+  ) %>%
+  # Pivot the two outcomes into a long format
+  pivot_longer(
+    cols = starts_with("Outcome"),
+    names_to = c("Outcome", ".value"),
+    names_pattern = "Outcome (\\d+)_(.*)"
+  ) %>%
+  #  Rename outcome numbers to your descriptive labels
+  mutate(
+    Outcome = if_else(Outcome == "1", "50% Seizure Reduction", "Seizure Freedom")
+  ) %>%
+  mutate(est = str_remove(Est_SE, " \\(.*\\)"
+                          )) %>%
+  #  Separate the confidence intervals into low (lcl) and high (ucl) bounds
+  separate_wider_delim(
+    cols = CI_95, 
+    delim = " to ", 
+    names = c("lcl", "ucl")
+  ) %>%
+  # Clean up data types 
+  mutate(
+    lcl = as.numeric(lcl),
+    ucl = as.numeric(ucl),
+    est = as.numeric(est)
+  ) %>%
+  #select/reorder the final columns
+  select(Model, Effect, Approach, Outcome, est, lcl, ucl)
+```
+
+
+```{r}
+# Ordering
+dat <- dat %>%
+  mutate(
+    Model = factor(
+      Model,
+      levels = c("Univariate",
+                 "Bivariate (r = 0)",
+                 "Bivariate (r = 0.7)")),
+    Approach = factor(
+      Approach,
+      levels = c("Naive estimate",
+                 "Selection on effect estimate",
+                 "Selection on z-score"))) %>%
+  arrange(Model, Approach)
+
+# create the label for ploting
+dat$Label <- factor(
+  dat$Approach,
+  levels = rev(c("Naive estimate",
+                 "Selection on effect estimate",
+                 "Selection on z-score")))
+
+dat$Label <- factor(dat$Label,
+                   levels = rev(unique(dat$Label)))
+```
+
+```{r, fig.width=10, fig.height=6}
+
+# have enough space between imputation models, otherwise they are plotted on
+# top of each other
+pd <- position_dodge(width = 0.6, 
+                     reverse = TRUE)
+
+ggplot(dat,
+       aes(x = est, y = Label, xmin = lcl, xmax = ucl, colour = Model)) +
+  geom_vline(xintercept = 0, linetype = 2, colour = "grey40") +
+  geom_errorbarh(width = 0.15, linewidth = 0.7, position = pd) +
+  geom_point(size = 3, position = pd) +
+  facet_grid(Effect ~ Outcome, 
+             scales = "free_y", space = "free_y") +
+  labs(x = "Log (OR)/ Log (RR)",
+       y = NULL,
+       colour = "Imputation model") +
+  theme_bw(base_size = 16) +
+  theme(legend.position = "bottom",
+        legend.text = element_text(size = 16),
+        legend.title = element_text(size = 16),
+        strip.background = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.grid.major.y = element_blank(),
+        strip.text = element_text(face = "bold"),
+        axis.text.y = element_text(size = 16, colour = "black"))
+
+
+ggsave("Plots_Paper/Forestplot.png", width = 10, height = 6)
+```
+
