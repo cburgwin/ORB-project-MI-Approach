@@ -146,6 +146,9 @@ Cora Burgwinkel, Saverio Fontana and Leonhard Held
 ## Project status
 The manuscript has been submitted to the collection Reproducibility, transparency and open science at BMC Medical Research Methodology on 8th July 2026.
 
+## Funding
+CB and LH are members of the SHARE-CTD doctoral network on clinical trial data sharing (Horizon-MSCA.2022-DN 110120360), funded by the European Union. The authors are supported by the Swiss State Secretariat for Education, Research and Innovation (SERI) under subsidy contract No. 23.00303.
+
 ## Citation
 Cite the preprint as 
 > Burgwinkel C, Fontana S, and Held L. Adjusting for Outcome Reporting Bias in Meta-analysis: A Multiple Imputation Approach. 2026. arXiv preprint: [arxiv:2607.07509](https://arxiv.org/abs/2607.07509).
