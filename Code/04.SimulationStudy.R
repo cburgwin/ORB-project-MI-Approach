@@ -3,7 +3,7 @@
 #---------------------------------------------------------
 
 # load functions and libraries
-source("00.Functions.R")
+source("Code/00.Functions.R")
 library(parallel)
 library(dplyr)
 library(readr)
@@ -21,7 +21,7 @@ n_cores       <- parallel::detectCores() - 32
 
 
 # create folder to save each scenario
-save_dir <- "sim_results"
+save_dir <- "Data/sim_results"
 
 if (dir.exists(save_dir)) {
   # Find all old scenario files inside the directory
@@ -296,6 +296,7 @@ run_ORB <- function(scenario_idx) {
         theta_cols = c("O1_yi","O2_yi"),
         se_cols = c("O1_sei","O2_sei"),
         rho_w = rho_w,
+        rho_b = rho_w,    # SAME VALUE IN BOTH --> Kirkh
         tau2_val = tau2_val,
         m = M_imputations
       )
