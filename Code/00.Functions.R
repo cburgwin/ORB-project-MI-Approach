@@ -298,7 +298,8 @@ run_bivariate_imputation <- function(data,
   
   
   K <- nrow(data)
-  
+  r_draws <- NULL   # NEW: m x K correlation draws, only for "estimated" / "studyspecific"
+
   # --- Compute or Assign the Correlation Vector (r_vec) ---
   if (is.character(rho_w) && rho_w %in% c("estimated", "studyspecific")) {
     
@@ -323,18 +324,20 @@ run_bivariate_imputation <- function(data,
     # Mean and SE on Fisher z-scale
     mu_z <- mean(CIz)
     se_z <- diff(CIz) / (2 * 1.96)
+
+    # NEW: the naive fit uses V using the Pearson point estimate (-0.31 in Application) 
+    # the uncertainty enters per imputation through r_draws
+    r_vec <- rep(rho_hat, K)  
     
+    # so we want to create a matrix m x K of correlations. 
     if (rho_w == "estimated") {
-      # One global correlation with uncertainty drawn once
-      r_global <- tanh(rnorm(1, 
+      # One global correlation per imputation (= row) same for all studies
+      r_draws <- matrix( tanh(rnorm(m, 
                              mean = mu_z,
-                             sd = se_z)) 
-      r_vec <- rep(r_global, K)
+                             sd = se_z)), nrow = m, ncol = K)
     } else if (rho_w == "studyspecific") {
-      # One unique correlation sampled per study
-      r_vec <- tanh(rnorm(K,
-                          mean = mu_z, 
-                          sd = se_z))
+      # NEW: one correlation per imputation and per study
+      r_draws <- matrix(tanh(rnorm(m * K, mean = mu_z, sd = se_z)), nrow = m, ncol = K)
     }
     
   } else {
@@ -364,7 +367,7 @@ run_bivariate_imputation <- function(data,
  # NOTE --> These two problem should be handled in the DGP, so should never fire. 
 
 
-  # build the within study covariance 
+  # build the within study covariance, using r_vec, which contains rho_hat (given or Pearson)
   V_list <- list()
   for (i in 1:K) { # one for each study 
     v1 <- data[[se_cols[1]]][i]^2
@@ -373,7 +376,7 @@ run_bivariate_imputation <- function(data,
     V_list[[i]] <- matrix(c(v1, cov_12, cov_12, v2), 2, 2)
   }
   
-  V_full <- as.matrix(Matrix::bdiag(V_list))
+  V_full <- as.matrix(Matrix::bdiag(V_list)) # This V_full is then used in the naive 
   
   # Create Long Data 
   # --> df that has row 1 = study 1 outcome 1, row 2 = study 1 outcome 2, row 3 = study 2 outcome 1 ....
@@ -413,17 +416,29 @@ run_bivariate_imputation <- function(data,
   rho_b_hat <- res_naive$rho   #  if the rho_B provided to run_biv_imp() is NULL, then rho_b_hat is estimated
   # if the rho_b is a number rho_b_hat = that number
   
-  # Extract Psi (Between-study variance-covariance matrix)  
+  # Create Psi (Between-study variance-covariance matrix)  
   Psi <- matrix(c(
     tau2_1, rho_b_hat * sqrt(tau2_1) * sqrt(tau2_2),
     rho_b_hat * sqrt(tau2_1) * sqrt(tau2_2), tau2_2),
     nrow = 2, ncol = 2
     )
   I_K <- diag(K)
-  
+
+    #  Conditionals (Eq. 11)
+  theta_MA_vec <- rep(coef(res_naive), times = K)  # vector 2K
+  theta_R_MA <- theta_MA_vec[rep_idx] # vector K_R
+  theta_U_MA <- theta_MA_vec[unrep_idx] # vector K_U
+  theta_R <- y_vec[rep_idx] # extract reported estimates
+
+
+  # Now, we estimated the naive model using rho_hat (which can be a given number or "estimated" or "studyspecific"),
+  # but with the r_draws we need to build a matrix every imputation
+
+  # so we use this function that impute the values given a specific within Variance matrix V
+  draw_missing_outcomes <- function(V, n) {  
   # Use the Kronecker product to tile the 2x2 Vb_matrix across every study pair
   # This results in the 2K x 2K matrix  
-  Sigma <- V_full + kronecker(I_K, Psi) + kronecker(J_K, Cov_theta_MA)
+  Sigma <- V + kronecker(I_K, Psi) + kronecker(J_K, Cov_theta_MA)
   
   # partitioning 
   Sigma_RR <- Sigma[rep_idx, rep_idx, drop = FALSE]
@@ -431,20 +446,43 @@ run_bivariate_imputation <- function(data,
   Sigma_UR <- Sigma[unrep_idx, rep_idx, drop = FALSE]
   Sigma_RU <- Sigma[rep_idx, unrep_idx, drop = FALSE]
   
-  #  Conditionals (Eq. 11)
-  theta_MA_vec <- rep(coef(res_naive), times = K)  # vector 2K
-  theta_R_MA <- theta_MA_vec[rep_idx] # vector K_R
-  theta_U_MA <- theta_MA_vec[unrep_idx] # vector K_U
-  theta_R <- y_vec[rep_idx] # get reported summary estimates
   
   inv_Sigma_RR <- solve(Sigma_RR)
   mu_cond <- theta_U_MA + Sigma_UR %*% inv_Sigma_RR %*% (theta_R - theta_R_MA)
   Sigma_cond <- Sigma_UU - Sigma_UR %*% inv_Sigma_RR %*% Sigma_RU
   
   # Generate M Imputations
-  imputed_draws <- MASS::mvrnorm(n = m,
+  MASS::mvrnorm(n = n, # it will be a bit slower in the rho = "estimated" or "studyspec" case since it draws the missing one imputed row at the time 
                                  mu = as.numeric(mu_cond),
                                  Sigma = Sigma_cond)
+
+  }
+
+  # Generate the M imputations 
+    V_draws <- NULL    
+  if (is.null(r_draws)) {   # traditional case, rho_w is fixed and not sampled, the Simulation goes here 
+    imputed_draws <- draw_missing_outcomes(V_full, m)       # fixed rho_w: as used in naive 
+  } else {                                                                     # in the application, r_draws is a 1000 x 12 matrix of sampled correlations
+
+    V_draws <- list() # one withing corr matrix V for each imputed dataset
+    imputed_draws <- matrix(NA, nrow = m, ncol = length(unrep_idx)) # 1000 x 7 matrix 
+
+    # Loop over imputations
+    for (imp in 1:m) {   
+
+      V_list <- list()   # list of each withing study correlation V for each study (to then unify in a blockdiag)
+      for (study in 1:K) { # one block for each study 
+        v1 <- data[[se_cols[1]]][study]^2   
+        v2 <- data[[se_cols[2]]][study]^2   
+        cov_12 <- r_draws[imp, study] * sqrt(v1) * sqrt(v2)                       
+        V_list[[study]] <- matrix(c(v1, cov_12, cov_12, v2), 2, 2)  
+      }   
+      V_draws[[imp]] <- as.matrix(Matrix::bdiag(V_list))                         
+
+      imputed_draws[imp, ] <- draw_missing_outcomes(V_draws[[imp]], 1)                  
+    }                                                                          
+  }     
+
   if (length(unrep_idx) == 1) {
     imputed_draws <- matrix(imputed_draws, ncol = 1)
   }
@@ -455,6 +493,8 @@ run_bivariate_imputation <- function(data,
     res_naive    = res_naive,
     data_long    = data_long,
     V_full       = V_full,
+    r_draws      = r_draws,   # NULL for fixed rho_w
+    V_draws      = V_draws,   # list of m within-study matrices; NULL for fixed rho_w
     theta_cols   = theta_cols
   ))
 }
@@ -487,10 +527,13 @@ fit_imputations_biv <- function(mi_results,
     # create complete dataset
     d$yi[unrep_idx] <- imp_draws[m, ]
 
+    # NEW: refit with the V this imputation was drawn with (V_full when rho_w is fixed)
+    V_m <- if (is.null(mi_results$V_draws)) V_full else mi_results$V_draws[[m]]
+
     #fit the results
     tryCatch(
       rma.mv(yi,
-             V = V_full,
+             V = V_m,   # NEW (was V_full)
              mods = ~ outcome - 1,
              random = ~ outcome | Study_id,
              struct = "UN",
