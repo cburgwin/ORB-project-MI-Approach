@@ -7,6 +7,7 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_knit$set(root.dir = "..")   # paths relative to the repository root, as in 01 and 02
 
 # load libaries
 library(dplyr)
@@ -58,14 +59,14 @@ ggplot(data = final_uni_df_O1, aes(x = as.numeric(Selection))) +
         legend.title = element_text(size = 16),
         strip.text = element_text(size = 16))
 
-ggsave("Plots_Paper/App_Uni_REM_O1.png", width = 10, height = 10)
+ggsave("Paper/figures/App_Uni_REM_O1.png", width = 10, height = 10)
 ```
 
 
 # Plot Univariate for seizure freedom
 
 ```{r, fig.width = 10, fig.height = 10}
-final_uni_df_O2 <- read.csv2("data/data_uni_df_O2.csv", sep = ",")
+final_uni_df_O2 <- read.csv2("Data/data_uni_df_O2.csv", sep = ",")
 
 final_uni_df_O2 <- final_uni_df_O2 %>%
   mutate(across(c(Estimate_adjusted, Estimate_unadjusted,
@@ -84,9 +85,9 @@ ggplot(data = final_uni_df_O2, aes(x = as.numeric(Selection))) +
   geom_line(aes(y = Estimate_unadjusted, color = "Naive Estimate"),
             linetype = "dashed", linewidth = 1) +
   # Facet by z_score and effect_estimate
-  facet_grid(Z_score ~ Effect_estimate,
-             labeller = labeller(Effect_estimate = c("odds_ratio" = "Effect Estimate: Odds Ratio (OR)",
-                                                     "relative_risk" = "Effect Estimate: Relative Risk (RR)"),
+  facet_grid(Z_score ~ Measure,
+             labeller = labeller(Measure = c("log OR" = "Effect Estimate: Odds Ratio (OR)",
+                                                     "log RR" = "Effect Estimate: Relative Risk (RR)"),
                                  Z_score = c("TRUE" = "Selection on Z-score",
                                              "FALSE" = "Selection on log OR/log RR"))) +
   # Define scales for colors and fill
@@ -105,7 +106,7 @@ ggplot(data = final_uni_df_O2, aes(x = as.numeric(Selection))) +
         legend.title = element_text(size = 16),
         strip.text = element_text(size = 16))
 
-ggsave("Plots_Paper/App_Uni_REM_O2.png", width = 10, height = 10)
+ggsave("Paper/figures/App_Uni_REM_O2.png", width = 10, height = 10)
 ```
 
 
@@ -114,7 +115,7 @@ ggsave("Plots_Paper/App_Uni_REM_O2.png", width = 10, height = 10)
 
 ```{r, fig.width = 10, fig.height = 10}
 
-plot_biv_df <- read.csv2("Data/data_biv_df_S.csv", sep = ",")
+plot_biv_df <- read.csv2("Data/data_biv_df.csv", sep = ",")
 
 # only plot outcome two
 plot_biv_df_O1 <- subset(plot_biv_df, Outcome == "O1")
@@ -185,7 +186,7 @@ ggplot(data = final_biv_df_O1, aes(x = as.numeric(Selection))) +
          legend.title = element_text(size = 16),
          strip.text = element_text(size = 16)) 
 
-ggsave("Plots_Paper/App_Corr_12_mv_REM_O1.png", width = 10, height = 10)
+ggsave("Paper/figures/App_Corr_12_mv_REM_O1.png", width = 10, height = 10)
 
 ```
 
@@ -193,7 +194,7 @@ ggsave("Plots_Paper/App_Corr_12_mv_REM_O1.png", width = 10, height = 10)
 
 ```{r, fig.width = 10, fig.height = 10}
 
-plot_biv_df <- read.csv2("data/data_biv_df_S.csv", sep = ",")
+plot_biv_df <- read.csv2("Data/data_biv_df.csv", sep = ",")
 
 # only plot outcome two
 plot_biv_df <- subset(plot_biv_df, Outcome == "O2")
@@ -265,11 +266,11 @@ ggplot(data = final_biv_df, aes(x = as.numeric(Selection))) +
          legend.title = element_text(size = 16),
          strip.text = element_text(size = 16))
 
-ggsave("Plots_Paper/App_Corr_12_mv_REM_O2.png", width = 10, height = 10)
+ggsave("Paper/figures/App_Corr_12_mv_REM_O2.png", width = 10, height = 10)
 ```
 
 # Plot Univariate and Multivariate for comparison for seizure reduction
-## within-study correlation of 0.5
+## within-study correlation of -0.3
 
 ```{r, fig.width = 10, fig.height = 10}
 
@@ -342,12 +343,12 @@ ggplot(data = plotdf, aes(x = as.numeric(Selection))) +
         legend.title = element_text(size = 16),
         strip.text = element_text(size = 16))
 
-ggsave("Plots_Paper/Uni_Multi_Comp_12_REM_05_01.png", width = 10, height = 10)
+ggsave("Paper/figures/Uni_Multi_Comp_12_REM_05_01.png", width = 10, height = 10)
 ```
 
 
 # Plot Univariate and Multivariate for comparison for seizure freedom
-## within-study correlation of 0.5
+## within-study correlation of -0.3
 
 ```{r, fig.width = 10, fig.height = 10}
 
@@ -420,14 +421,14 @@ ggplot(data = plotdf, aes(x = as.numeric(Selection))) +
         legend.title = element_text(size = 16),
         strip.text = element_text(size = 16))
 
-ggsave("Plots_Paper/Uni_Multi_Comp_12_REM_05.png", width = 10, height = 10)
+ggsave("Paper/figures/Uni_Multi_Comp_12_REM_05.png", width = 10, height = 10)
 ```
 
 ## create forest plot
 
 ```{r}
 # read data in from Table_2.rds
-data <- readRDS("data/Table_2.rds")
+data <- readRDS("Data/Table_2.rds")
 
 # transform data to plot them as forest plot
 dat <- data %>%
@@ -515,6 +516,10 @@ ggplot(dat,
   geom_point(size = 3, position = pd) +
   facet_grid(Effect ~ Outcome, 
              scales = "free_y", space = "free_y") +
+  # label the bivariate models by the within-study correlation (rho_B is estimated)
+  scale_colour_discrete(labels = c("Univariate",
+                                   expression("Bivariate ("*rho[W]*" = 0)"),
+                                   expression("Bivariate ("*rho[W]*" = 0.7)"))) +
   labs(x = "Log (OR)/ Log (RR)",
        y = NULL,
        colour = "Imputation model") +
@@ -529,6 +534,6 @@ ggplot(dat,
         axis.text.y = element_text(size = 16, colour = "black"))
 
 
-ggsave("Plots_Paper/Forestplot.png", width = 10, height = 6)
+ggsave("Paper/figures/Forestplot.png", width = 10, height = 6)
 ```
 

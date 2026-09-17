@@ -1,5 +1,5 @@
 # load source code and data
-source("00.Functions.R")
+source("Code/00.Functions.R")
 df_topiramate <- readRDS("Data/df_topiramate.RDS")
 
 
@@ -200,7 +200,7 @@ table_2_biv_repro <- final_biv_df  |>
 # ----------------------------------
 FULL_TABLE_2 <- rbind(table_2_uni_repro, table_2_biv_repro)
 
-saveRDS(FULL_TABLE_2, file = "Table_2.rds")
+saveRDS(FULL_TABLE_2, file = "Data/Table_2.rds")
 cat("Table 2 created")
 
 
@@ -209,19 +209,22 @@ cat("Table 2 created")
 # Run Code for Plots
 # -------------------------------------------------------------------------
 
-####### Univariate: only for seizure freedom
+####### Univariate: both outcomes
 
 
-res_uni_plot <- list()
 deltas <- seq(from = 0, to = 1.3, by = 0.1)
 measures <- c("OR", "RR")
 m_imputations <- 1000
+outcomes <- c(1,2)
 
+#Loop 0: iterate over the two outcomes
+for (o in outcomes) {
+res_uni_plot <- list()   # reset per outcome, otherwise the O2 file also contains the O1 rows
 # Loop 1: Iterate over measures first and impute once per measure
 for (m in measures) {
 
-  theta_cols <- paste0("log_", m, "1")
-  se_cols <- paste0("se_", m, "1")
+  theta_cols <- paste0("log_", m, o)
+  se_cols <- paste0("se_", m, o)
 
   cat(sprintf("Generating imputed data for Measure = %s\n", m))
 
@@ -293,9 +296,12 @@ adjusted_df <- plot_uni_df %>%
 final_uni_df <- adjusted_df %>%
   left_join(naive_df, by = c("Selection", "Measure"))
 
-# save data
-write_csv(final_uni_df, "data/data_uni_df_O1.csv")
+# file to save 
+file_name <- paste0("Data/data_uni_df_O", o, ".csv")
 
+# save data
+write_csv(final_uni_df, file_name)
+}
 
 
 ############## Bivariate #####################
@@ -305,6 +311,9 @@ rhos <- c(-0.9, -0.6, -0.3, 0, 0.3, 0.6, 0.67, "estimated", "studyspecific")
 deltas <- seq(from = 0, to = 1.3, by = 0.1) 
 m_imputations <- 1000
 
+
+# seed so the "estimated" and "studyspecific" draws do not depend on what ran before (N14)
+set.seed(1)
 
 # loop over the rhos 
 for (rho in rhos) {
@@ -372,6 +381,6 @@ plot_biv_df <- do.call(rbind,
                        res_biv_df)
 
 # save data
-write_csv(plot_biv_df, "data_biv_df.csv")
+write_csv(plot_biv_df, "Data/data_biv_df.csv")
 
 

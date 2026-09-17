@@ -68,9 +68,10 @@ run_univariate_imputation <- function(data,
   
   # Indexes after reordering
   rep_idx <- 1:n_rep
-  unrep_idx <- (n_rep + 1):K
-  
-  # if nothing missing, return null
+  # unrep_idx <- (n_rep + 1):K
+  unrep_idx <- n_rep + seq_len(n_unrep) 
+
+  # if nothing missing, return null. 
   if (length(unrep_idx) == 0) return(NULL)
   
   # but also we need at least 4 reported studies
@@ -78,6 +79,8 @@ run_univariate_imputation <- function(data,
     warning("Fewer than 4 reported studies. Cannot estimate heterogeneity. Skipping.")
     return(NULL) 
   }
+
+  # NOTE --> These two problem should be handled in the DGP, so should never fire. 
   
   
   # Fit REML on the reported data (Naive Estimate), save estimate & SE
@@ -183,7 +186,7 @@ adj_univariate <- function(mi_results,
       rma(yi = yi_complete, 
           sei = data_ordered[[se_col]], 
           method = model_type,
-          tau2 = tau2_val,
+          tau2 = tau2_val, # NOTE: freezing the tau at the estimated naive tau
           control = list(stepadj = 0.1, 
                          rel.tol = 1e-5, 
                          maxiter = 200)),
@@ -242,7 +245,8 @@ run_bivariate_imputation <- function(data,
                                      se_cols, 
                                      rho_w = 0.4, 
                                      m = 1000, 
-                                     tau2_val,
+                                     tau2_val = NULL,  # NULL = tau2 estimated (application), value = fixed (simulation)
+                                     rho_b = NULL,     # NULL = rho_B estimated (application), value = fixed (simulation)
                                      model_type = "REML") {
   
   
@@ -254,6 +258,7 @@ run_bivariate_imputation <- function(data,
     # Identify complete cases using the dynamic theta_cols passed into the function
     complete_cases <- which(!is.na(data[[theta_cols[1]]]) & !is.na(data[[theta_cols[2]]]))
     
+    # NOTE --> this shoud be handled by the DGP
     if (length(complete_cases) < 4) {
       stop("Not enough complete pairs in the data to estimate a Pearson correlation.")
     }
@@ -309,7 +314,9 @@ run_bivariate_imputation <- function(data,
     warning("Fewer than 4 reported studies. Cannot estimate heterogeneity. Skipping.")
     return(NULL) 
   }
-  
+ # NOTE --> These two problem should be handled in the DGP, so should never fire. 
+
+
   # build the within study covariance 
   V_list <- list()
   for (i in 1:K) { # one for each study 
@@ -342,11 +349,12 @@ run_bivariate_imputation <- function(data,
                       random = ~ outcome | Study_id, 
                       struct = "UN",  # true effects varies for each study id (heterogeneity)
                       data = reported_long, 
-                      method = model_type, 
-                      rho = rho_hat,
-                      tau2 = tau2_val,
-                      control=list(rel.tol=1e-8,
-                                   maxiter=200))
+                      method = model_type,
+                      rho = rho_b,       # NULL -> rho_B estimated; a value provided above -> rho_B fixed
+                      tau2 = tau2_val,   # NULL -> estimated (application); value -> fixed (simulation)
+                      control = list(stepadj = 0.1,
+                            rel.tol = 1e-5,
+                            maxiter = 200)) #https://stat.ethz.ch/pipermail/r-sig-meta-analysis/2020-November/002433.html
   
   # Construct Total Covariance Matrix Sigma
   Cov_theta_MA <- vcov(res_naive)
