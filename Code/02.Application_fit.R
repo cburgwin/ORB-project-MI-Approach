@@ -17,6 +17,9 @@ measures <- c("OR", "RR")
 rhos <- c(0, 0.7) # that needs to be used for multivariate
 m_imputations <- 1000
 
+# proportion of failed refits 
+failed_refits <- c()
+
 
 # -------------------------------------------------------------------------
 # Univariate Table Generation 
@@ -51,17 +54,23 @@ for (meas in measures) {
       CI_Lower = mi$res_naive$ci.lb,
       CI_Upper = mi$res_naive$ci.ub
     )
+    
+    # refit the imputed datasets once, reused for both selection types
+    fits_uni <- fit_imputations_uni(mi)
+    failed_refits[paste0("Table2 uni ", meas, " O", out_num)] <- attr(fits_uni, "failed.proportion")
 
     #  Adjusted estimate for - Effect measure and Z-score
     adj_eff <- adj_univariate(mi,
                               delta = 0.5,
                               select_type = "effect",
-                              track.ess = FALSE)
+                              track.ess = FALSE,
+                              fits = fits_uni)
 
     adj_z   <- adj_univariate(mi,
                               delta = 0.5,
                               select_type = "zscore",
-                              track.ess = FALSE)
+                              track.ess = FALSE,
+                              fits = fits_uni)
 
     # Stack
     tmp <- rbind(naive_df,
@@ -144,19 +153,25 @@ for (rho in rhos) {
       CI_Lower  = mi_biv$res_naive$ci.lb,
       CI_Upper  = mi_biv$res_naive$ci.ub
     )
+    
+    # refit the imputed datasets once, reused for both selection types
+    fits_biv <- fit_imputations_biv(mi_biv)
+    failed_refits[paste0("Table2 biv ", m, " rho_w=", rho)] <- mean(sapply(fits_biv, is.null))
 
     # Calculate both Adjustments (each return a 2-row dataframe for O1 and O2)
     adj_eff <- adj_bivariate(mi_biv,
                              delta = 0.5,
                              select_type = "effect",
                              track.ess = FALSE,
-                             track.failed.proportion = FALSE)
+                             track.failed.proportion = FALSE,
+                             fits = fits_biv)
 
     adj_z   <- adj_bivariate(mi_biv,
                              delta = 0.5,
                              select_type = "zscore",
                              track.ess = FALSE,
-                             track.failed.proportion = FALSE)
+                             track.failed.proportion = FALSE,
+                             fits = fits_biv)
 
     # stack them
     tmp <- rbind(naive_df,
@@ -244,6 +259,10 @@ for (m in measures) {
     CI_Lower = mi$res_naive$ci.lb,
     CI_Upper = mi$res_naive$ci.ub
   )
+  
+  # refit the imputed datasets once, reused for every delta and selection type
+  fits_uni <- fit_imputations_uni(mi)
+  failed_refits[paste0("Plot uni ", m, " O", o)] <- attr(fits_uni, "failed.proportion")
 
   # Loop 2: Now test different deltas using the same imputed data
   for (delta in deltas) {
@@ -254,12 +273,14 @@ for (m in measures) {
     adj_eff <- adj_univariate(mi,
                               delta = delta,
                               select_type = "effect",
-                              track.ess = FALSE)
+                              track.ess = FALSE,
+                              fits = fits_uni)
 
     adj_z   <- adj_univariate(mi,
                               delta = delta,
                               select_type = "zscore",
-                              track.ess = FALSE)
+                              track.ess = FALSE,
+                              fits = fits_uni)
 
     # Stack the results
     tmp <- rbind(naive_df, adj_eff, adj_z)
@@ -312,7 +333,7 @@ deltas <- seq(from = 0, to = 1.3, by = 0.1)
 m_imputations <- 1000
 
 
-# seed so the "estimated" and "studyspecific" draws do not depend on what ran before (N14)
+
 set.seed(1)
 
 # loop over the rhos 
@@ -345,6 +366,10 @@ for (rho in rhos) {
       CI_Upper  = mi_biv$res_naive$ci.ub
     )
     
+    # refit the imputed datasets once, reused for every delta and selection type
+    fits_biv <- fit_imputations_biv(mi_biv)
+    failed_refits[paste0("Plot biv ", m, " rho_w=", rho)] <- mean(sapply(fits_biv, is.null))
+    
     for(delta in deltas) {
       
       cat(sprintf("  -> Calculating Bivariate Adjustments for delta = %s\n", delta))
@@ -354,13 +379,15 @@ for (rho in rhos) {
                                delta = delta, 
                                select_type = "effect",
                                track.ess = FALSE, 
-                               track.failed.proportion = FALSE)
+                               track.failed.proportion = FALSE,
+                               fits = fits_biv)
       
       adj_z   <- adj_bivariate(mi_biv, 
                                delta = delta, 
                                select_type = "zscore", 
                                track.ess = FALSE, 
-                               track.failed.proportion = FALSE)
+                               track.failed.proportion = FALSE,
+                               fits = fits_biv)
       
       # stack them
       tmp <- rbind(naive_df,
@@ -382,5 +409,9 @@ plot_biv_df <- do.call(rbind,
 
 # save data
 write_csv(plot_biv_df, "Data/data_biv_df.csv")
+
+# proportion of failed refits per imputation run (0 = every refit succeeded)
+print(failed_refits)
+saveRDS(failed_refits, file = "Data/failed_refits.rds")
 
 

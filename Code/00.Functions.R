@@ -134,11 +134,62 @@ run_univariate_imputation <- function(data,
 #  Importance Sampling 
 # --------------------------
 
-adj_univariate <- function(mi_results, 
-                           delta = 0.5, 
-                           select_type = "zscore",
-                           model_type = "REML", 
-                           track.ess = TRUE) {
+# Split in two so the M refits are computed once and reused for every delta and selection type:
+# fit_imputations_uni(): refit on each completed dataset
+# pool_univariate():     importance weights and Rubin's rules
+# adj_univariate():      as before; with fits = NULL it refits (simulation), otherwise reuses fits
+
+fit_imputations_uni <- function(mi_results,                    
+                                model_type = "REML") {         
+  
+  imp_draws  <- mi_results$imp_draws
+  data_ordered <- mi_results$data_ordered
+  unrep_idx    <- mi_results$unrep_idx
+  
+  # ensure imp_draws is a matrix
+  if (!is.matrix(imp_draws)) imp_draws <- matrix(imp_draws, ncol = length(unrep_idx))
+  M <- nrow(imp_draws)
+  
+  
+  # if nothing missing, return null, will handle better in the outer loop of the simulation
+  if (length(unrep_idx) == 0) return(NULL) # I think it can never happen
+  
+  
+  theta_col    <- mi_results$theta_col  #  from mi_results
+  se_col       <- mi_results$se_col     #  from mi_results
+  tau2_val <- mi_results$res_naive$tau2 # from mi_results
+  
+  # rma on each complete dataset 
+  # vector of thetas that is like [c(reported), NA, NA,NA ...]
+  
+  yi_base <- data_ordered[[theta_col]]
+  
+  fits <- lapply(seq_len(M), function(m) {
+    yi_complete <- yi_base
+    yi_complete[unrep_idx] <- imp_draws[m, ] # complete the vector of thetas with the simulated draws from here
+    tryCatch(
+      rma(yi = yi_complete, 
+          sei = data_ordered[[se_col]], 
+          method = model_type,
+          tau2 = tau2_val, # NOTE: freezing the tau at the estimated naive tau
+          control = list(stepadj = 0.1, 
+                         rel.tol = 1e-5, 
+                         maxiter = 200)),
+      error = function(e) NULL
+    )
+  })
+
+  attr(fits, "failed.proportion") <- mean(sapply(fits, is.null))   # NEW:  failed refits
+  return(fits)   # failed fits stay as NULL
+}
+
+
+
+pool_univariate <- function(mi_results,                        
+                            fits,                              # output of fit_imputations_uni()
+                            delta = 0.5,
+                            select_type = "zscore",
+                            track.ess = TRUE) {
   
   imp_draws  <- mi_results$imp_draws
   data_ordered <- mi_results$data_ordered
@@ -174,28 +225,12 @@ adj_univariate <- function(mi_results,
     log_weights <- - delta * rowSums(imp_draws)
   }
   
-  # rma on each complete dataset 
-  # vector of thetas that is like [c(reported), NA, NA,NA ...]
-  
-  yi_base <- data_ordered[[theta_col]]
-  
-  fits <- lapply(seq_len(M), function(m) {
-    yi_complete <- yi_base
-    yi_complete[unrep_idx] <- imp_draws[m, ] # complete the vector of thetas with the simulated draws from here
-    tryCatch(
-      rma(yi = yi_complete, 
-          sei = data_ordered[[se_col]], 
-          method = model_type,
-          tau2 = tau2_val, # NOTE: freezing the tau at the estimated naive tau
-          control = list(stepadj = 0.1, 
-                         rel.tol = 1e-5, 
-                         maxiter = 200)),
-      error = function(e) NULL
-    )
-  })
-  
-  # only take not failed 
+  # NEW check -->  fits must come from the same imputations, one per row of imp_draws    
+  if (length(fits) != M) stop("fits and imp_draws do not match")
+
+  # only take not failed
   valid       <- !sapply(fits, is.null)
+  if (!any(valid)) stop("All rma fits failed")   
   fits        <- fits[valid]
   log_weights <- log_weights[valid]
   
@@ -225,13 +260,25 @@ adj_univariate <- function(mi_results,
     CI_Upper = theta_adj + 1.96 * sqrt(total_var)
   )
   
-  if (track.ess) {
+    if (track.ess) {
     ess <- 1 / sum(w_norm^2)
     out$ess <- ess
-  }
-  
+    }
+
   return(out)
-  
+}
+
+
+
+adj_univariate <- function(mi_results, 
+                           delta = 0.5, 
+                           select_type = "zscore",
+                           model_type = "REML", 
+                           track.ess = TRUE,                   
+                           fits = NULL) {
+    if (is.null(fits)) fits <- fit_imputations_uni(mi_results, model_type)
+
+    pool_univariate(mi_results, fits, delta, select_type, track.ess)
 }
 
 
@@ -363,12 +410,13 @@ run_bivariate_imputation <- function(data,
   # save estimates from naive bivariate MA
   tau2_1 <- res_naive$tau2[1]
   tau2_2 <- res_naive$tau2[2]
-  rho_b  <- res_naive$rho
+  rho_b_hat <- res_naive$rho   #  if the rho_B provided to run_biv_imp() is NULL, then rho_b_hat is estimated
+  # if the rho_b is a number rho_b_hat = that number
   
   # Extract Psi (Between-study variance-covariance matrix)  
   Psi <- matrix(c(
-    tau2_1, rho_b * sqrt(tau2_1) * sqrt(tau2_2),
-    rho_b * sqrt(tau2_1) * sqrt(tau2_2), tau2_2),
+    tau2_1, rho_b_hat * sqrt(tau2_1) * sqrt(tau2_2),
+    rho_b_hat * sqrt(tau2_1) * sqrt(tau2_2), tau2_2),
     nrow = 2, ncol = 2
     )
   I_K <- diag(K)
@@ -413,13 +461,64 @@ run_bivariate_imputation <- function(data,
 
 
 
-adj_bivariate <- function(mi_results,
-                          delta = 0.5,
-                          select_type = "zscore",
-                          model_type = "REML", 
-                          track.failed.proportion = TRUE, 
-                          track.ess = TRUE) {
-  
+# Same split as for the univariate functions
+
+fit_imputations_biv <- function(mi_results,        
+                                model_type = "REML") {
+
+  # --- SETUP
+  imp_draws <- mi_results$imp_draws
+  data_long <- mi_results$data_long
+  unrep_idx <- mi_results$unrep_idx
+  V_full <- mi_results$V_full
+
+  tau2_fixed <- mi_results$res_naive$tau2
+  rho_fixed  <- mi_results$res_naive$rho
+
+  if (!is.matrix(imp_draws)) imp_draws <- matrix(imp_draws, ncol = length(unrep_idx))
+  M <- nrow(imp_draws)
+  # ---
+
+  # --- FIT block
+  # loop for each draw
+  fits <- lapply(seq_len(M), function(m) {
+    d <- data_long
+
+    # create complete dataset
+    d$yi[unrep_idx] <- imp_draws[m, ]
+
+    #fit the results
+    tryCatch(
+      rma.mv(yi,
+             V = V_full,
+             mods = ~ outcome - 1,
+             random = ~ outcome | Study_id,
+             struct = "UN",
+             data = d,
+             method = model_type,
+             tau2 = tau2_fixed,
+             rho = rho_fixed,
+             control = list(stepadj = 0.1,
+                            rel.tol = 1e-5,
+                            maxiter = 200)),
+      error = function(e) NULL
+    )
+  })
+  # ---
+
+  return(fits)   #  failed fits stay as NULL
+}
+
+
+
+pool_bivariate <- function(mi_results,             
+                           fits,                   # output of fit_imputations_biv()
+                           delta = 0.5,
+                           select_type = "zscore",
+                           track.failed.proportion = TRUE,
+                           track.ess = TRUE) {
+
+  # --- SETUP
   imp_draws <- mi_results$imp_draws
   data_long <- mi_results$data_long
   unrep_idx <- mi_results$unrep_idx
@@ -430,14 +529,15 @@ adj_bivariate <- function(mi_results,
 
   if (!is.matrix(imp_draws)) imp_draws <- matrix(imp_draws, ncol = length(unrep_idx))
   M <- nrow(imp_draws)
-  
+  # ---
+
+  # --- weight block 1
   # extract the se useful for the z scores
-  sei_unrep <- data_long$sei[unrep_idx]  
-  
+  sei_unrep <- data_long$sei[unrep_idx]
+
   # check dimensions
   if (ncol(imp_draws) != length(sei_unrep)) stop ("Something is wrong with the number of unreported studies")
-  
-  
+
   if (select_type == "zscore") {
     # divides every row in 'imp_draws' by the 'sei_unrep' vector
     z_matrix <- sweep(imp_draws, 2, sei_unrep, FUN = "/")
@@ -445,57 +545,37 @@ adj_bivariate <- function(mi_results,
   } else {
     log_weights <- -delta * rowSums(imp_draws)
   }
-  
-  # loop for each draw
-  fits <- lapply(seq_len(M), function(m) {
-    d <- data_long
-    
-    # create complete dataset
-    d$yi[unrep_idx] <- imp_draws[m, ]
-    
-    #fit the results
-    tryCatch( 
-      rma.mv(yi,
-             V = V_full,
-             mods = ~ outcome - 1,
-             random = ~ outcome | Study_id, 
-             struct = "UN",
-             data = d, 
-             method = model_type,
-             tau2 = tau2_fixed,
-             rho = rho_fixed,
-             control = list(stepadj = 0.1,
-                            rel.tol = 1e-5, 
-                            maxiter = 200)),
-      error = function(e) NULL
-    )
-  })
-  
+  # ---
+
+  # NEW check -->  fits must come from the same imputations, one per row of imp_draws
+  if (length(fits) != M) stop("fits and imp_draws do not match")
+
+  # ---Weight block 2 till the end
   # extract valid
   valid       <- sapply(fits, function(x) !is.null(x))
   fits        <- fits[valid]
   log_weights <- log_weights[valid]
-  
+
   if (length(fits) == 0) stop("All rma.mv fits failed")
-  
+
   # Extract (note that sapply bind vectors together by columns)
   theta_MA_m <- t(sapply(fits, function(r) as.numeric(r$beta)))  # M x 2
   var_MA_m   <- t(sapply(fits, function(r) diag(r$vb)))           # M x 2
-  
+
   # Normalize weights
   max_log <- max(log_weights)
   w_norm <- exp(log_weights - max_log) / sum(exp(log_weights - max_log))
-  
-  # Adjusted estimates 
+
+  # Adjusted estimates
   # remember w_norm is a vector of 1000 weights
   # theta_MA_m is a 1000 x 2 matrix
   theta_adj <- colSums(w_norm * theta_MA_m)               # this returns a VECTOR of length 2
-  
+
   # Rubin rule
   var_within  <- colSums(w_norm * var_MA_m)
   var_between <- colSums(w_norm * sweep(theta_MA_m, 2, theta_adj, "-")^2)
   total_var   <- var_within + var_between #length 2 vector
-  
+
   if (length(theta_adj) != length(total_var) ) stop ("Something is off in the dimension of outcomes")
   out <- data.frame(
     Outcome  = c("O1", "O2"),
@@ -505,19 +585,34 @@ adj_bivariate <- function(mi_results,
     CI_Lower = theta_adj - 1.96 * sqrt(total_var),
     CI_Upper = theta_adj + 1.96 * sqrt(total_var)
   )
-  
+
   rownames(out) <- NULL
-  
+
   if (track.ess) {
     ess <- 1 / sum(w_norm^2)
     out$ess <- ess
   }
-  
-  if (track.failed.proportion) { 
+
+  if (track.failed.proportion) {
     failed.proportion <- sum(!valid) / M
     out$failed.proportion <- failed.proportion
   }
   return(out)
+}
+
+
+
+adj_bivariate <- function(mi_results,
+                          delta = 0.5,
+                          select_type = "zscore",
+                          model_type = "REML",
+                          track.failed.proportion = TRUE,
+                          track.ess = TRUE,
+                          fits = NULL) {                                          
+  if (is.null(fits)) fits <- fit_imputations_biv(mi_results, model_type)          
+
+  pool_bivariate(mi_results, fits, delta, select_type,                            
+                 track.failed.proportion, track.ess)
 }
 
 

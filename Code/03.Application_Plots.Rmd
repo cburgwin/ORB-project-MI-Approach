@@ -117,7 +117,7 @@ ggsave("Paper/figures/App_Uni_REM_O2.png", width = 10, height = 10)
 
 plot_biv_df <- read.csv2("Data/data_biv_df.csv", sep = ",")
 
-# only plot outcome two
+# only plot outcome one
 plot_biv_df_O1 <- subset(plot_biv_df, Outcome == "O1")
 
 # bring data into wide format
