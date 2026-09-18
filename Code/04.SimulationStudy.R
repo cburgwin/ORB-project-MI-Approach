@@ -2,6 +2,12 @@
 # FINAL script to send to cluster
 #---------------------------------------------------------
 
+# don't let BLAS interfere
+if (requireNamespace("RhpcBLASctl", quietly = TRUE)) {
+  RhpcBLASctl::blas_set_num_threads(1)
+  RhpcBLASctl::omp_set_num_threads(1)
+}
+
 # load functions and libraries
 source("Code/00.Functions.R")
 library(parallel)
@@ -9,7 +15,7 @@ library(dplyr)
 library(readr)
 
 # set seed for reproducibility
-RNGkind("L'Ecuyer-CMRG")
+RNGkind("L'Ecuyer-CMRG") 
 set.seed(1)
 
 # ---------------------------------------------------------
@@ -17,75 +23,161 @@ set.seed(1)
 # ---------------------------------------------------------
 n_sim         <- 1900
 M_imputations <- 200
-n_cores       <- parallel::detectCores() - 32
+n_cores       <- 50
+
+# create folder to save the folders containing each scenario
+
+# so the idea is: 
+
+# /Data
+### --> Sim_results 
+###         ----> run.tag.1 (e.g. correctly specified)
+###                   --------> scenario 1
+###                   ---------> ...
+###                
+###         ----> run.tag.2 (e.g. delta wrongly spec)
+###                   --------> scenario 1
+###                   ---------> ...
+###
+###         ----> run.tag.1 (e.g. rho )
+###                   --------> scenario 1
+###                   ---------> ...
+### --> Sim_summary 
+###         ---> corrsponding csv files 
+
+
+
+# ---------------------------------------------------------
+# Scenario grid
+# ---------------------------------------------------------
+
+
+run_type <- "tryout"   # "tryout", "full_grid", "misspecified_delta", "different_rhos"
+
+# one folder per run
+run_tag <- paste0(run_type, "_2026-09-18")
 
 # create folder to save each scenario
-save_dir <- "Data/Sim_results"
+save_dir <- file.path("Data", "Sim_results", run_tag)
+if (!dir.exists(save_dir)) dir.create(save_dir, recursive = TRUE)
 
-if (dir.exists(save_dir)) {
-  # Find all old scenario files inside the directory
-  old_files <- list.files(save_dir, pattern = "scenario_.*\\.rds", full.names = TRUE)
-  if (length(old_files) > 0) {
-    # Delete them cleanly
-    unlink(old_files, force = TRUE)
-  }
-} else {
-  # Create the folder if it doesn't exist yet
-  dir.create(save_dir, recursive = TRUE)
-}
 # create folder to save final csv output file
-out_dir <- "Data_Sim"
+out_dir <- file.path("Data", "Sim_summary")
 if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
 
 
-# ---------------------------------------------------------
-# Scenario grid 
-# ---------------------------------------------------------
-scenarios_grid <- expand.grid(
-  K           = c(25),
-  p1          = c(0.2),
-  tau2_val    = c(0, 0.02, 0.06, 0.36),
-  theta_1     = c(0.4),
-  theta_2     = c(0.4),
-  rho_b       = c(0.8),
-  rho_w       = c(0.8),
-  delta_sim   = seq(0, 1, by = 0.2),
-  delta_est   = seq(0, 1, by = 0.2),
-  select_type = c("zscore", "effect"),
-  stringsAsFactors = FALSE
-)  %>% unique() %>%
-  dplyr::filter(`delta_sim` == `delta_est`)
+
+scenarios_grid <- switch (run_type, 
+                            "tryout" = expand.grid(
+                                                    K           = c(25),
+                                                    p1          = c(0.2),
+                                                    tau2_val    = c(0, 0.02, 0.06, 0.36),
+                                                    theta_1     = c(0.4),
+                                                    theta_2     = c(0.4),
+                                                    rho_b       = c(0.8),
+                                                    rho_w       = c(0.8),
+                                                    delta_sim   = seq(0, 1, by = 0.2),
+                                                    delta_est   = seq(0, 1, by = 0.2),
+                                                    select_type = c("zscore", "effect"),
+                                                    stringsAsFactors = FALSE
+                                                  )  %>% unique() %>%
+                                                    dplyr::filter(delta_sim == delta_est),
+
+
+
+                            "full_grid" = expand.grid(
+                                                    K           = c(25),
+                                                    p1          = c(0.2),
+                                                    tau2_val    = c(0, 0.02, 0.06, 0.36),
+                                                    theta_1     = c(0.4),
+                                                    theta_2     = c(0.4),
+                                                    rho_b       = c(0.8),
+                                                    rho_w       = c(0.8),
+                                                    delta_sim   = seq(0, 1, by = 0.2),
+                                                    delta_est   = seq(0, 1, by = 0.2),
+                                                    select_type = c("zscore", "effect"),
+                                                    stringsAsFactors = FALSE
+                                                  )  %>% unique() %>%
+                                                    dplyr::filter(delta_sim == delta_est),
+
+
+
+                            "misspecified_delta" = expand.grid(
+                                                    K           = c(25),
+                                                    p1          = c(0.2),
+                                                    tau2_val    = c(0, 0.02, 0.06, 0.36),
+                                                    theta_1     = c(0.4),
+                                                    theta_2     = c(0.4),
+                                                    rho_b       = c(0.8),
+                                                    rho_w       = c(0.8),
+                                                    delta_sim   = seq(0, 1, by = 0.2),
+                                                    delta_est   = seq(0, 1, by = 0.2),
+                                                    select_type = c("zscore", "effect"),
+                                                    stringsAsFactors = FALSE
+                                                  )  %>% unique() %>%
+                                                    dplyr::filter(delta_sim == delta_est),
+
+
+                            "different_rhos" = expand.grid(
+                                                    K           = c(25),
+                                                    p1          = c(0.2),
+                                                    tau2_val    = c(0, 0.02, 0.06, 0.36),
+                                                    theta_1     = c(0.4),
+                                                    theta_2     = c(0.4),
+                                                    rho_b       = c(0.8),
+                                                    rho_w       = c(0.8),
+                                                    delta_sim   = seq(0, 1, by = 0.2),
+                                                    delta_est   = seq(0, 1, by = 0.2),
+                                                    select_type = c("zscore", "effect"),
+                                                    stringsAsFactors = FALSE
+                                                  )  %>% unique() %>%
+                                                    dplyr::filter(delta_sim == delta_est),
+
+                            stop("unknown run_type: ", run_type)
+) 
+                                                  
+
+
+
+
+
+
+
 
 
 total_scenarios <- nrow(scenarios_grid)
-cat(sprintf("System verified. Starting evaluation of %d simulation scenarios across %d system cores...\n",
+cat(sprintf("Starting evaluation of %d simulation scenarios across %d system cores...\n",
             total_scenarios, n_cores))
 
 
 # ---------------------------------------------------------
 # Wrappers to handle two cases of errors:
-# 1) -> failure of convergence of rma inside imputation function (either for 
-# numerical issues or more probably cause there are less than 2 reported studies)
+# 1) -> failure of convergence of rma inside imputation function 
 # 2) -> failure of convergence of rma inside adjust function for numerical issues
 # ---------------------------------------------------------
 
 safe_adj_uni <- function(mi, delta, sel_type) {
   
   # it get passed a null df in the case of a failure in rma naive
-  if (is.null(mi)) return(c(est = NA, ci_l = NA, ci_u = NA, ess = NA))
-  
+  if (is.null(mi)) return(c(est = NA, ci_l = NA, ci_u = NA, ess = NA, fail = NA))
+
   tryCatch({
+    # if we use fit_imputations_uni --> we can track the failed also for univariate 
+    fits <- fit_imputations_uni(mi)
+
     res <- adj_univariate(mi,
-                          delta = delta, 
-                          select_type = sel_type, 
+                          delta = delta,
+                          select_type = sel_type,
                           model_type = "REML",
-                          track.ess = TRUE)
-    
+                          track.ess = TRUE,
+                          fits = fits) # give this
+
     return(c(est = res$Estimate[1],
              ci_l = res$CI_Lower[1],
              ci_u = res$CI_Upper[1],
-             ess = res$ess[1]))
-  }, error = function(e) c(est = NA, ci_l = NA, ci_u = NA, ess = NA))
+             ess = res$ess[1],
+             fail = attr(fits, "failed.proportion"))) # track! 
+  }, error = function(e) c(est = NA, ci_l = NA, ci_u = NA, ess = NA, fail = NA))
 }
 
 safe_adj_biv <- function(mi, delta, sel_type) {
@@ -115,6 +207,8 @@ run_ORB <- function(scenario_idx) {
   output_file <- sprintf("%s/scenario_%05d.rds", save_dir, scenario_idx)
   if (file.exists(output_file)) return(NULL)
   
+  set.seed (100 + scenario_idx) # each scenario is reproducible !!
+
   # run through scenario grid
   s <- scenarios_grid[scenario_idx, ]
   
@@ -140,6 +234,15 @@ run_ORB <- function(scenario_idx) {
   n_attempts <- 0
   n_unexpected_failures <- 0
   
+
+  # LET'S COLLECT ALL ERROR MESSAGES
+  error_log <- character(0)
+
+  # instead of printing, add the error to the vector
+ log_error <- function(stage, e) {
+  error_log <<- c(error_log, paste0(stage, ": ", conditionMessage(e)))
+  message(stage, " failed: ", conditionMessage(e)) #still prints in the clustter 
+ }
   # Maximum number of outer attempts
   max_attempts <- 5 * n_sim
   
@@ -151,7 +254,7 @@ run_ORB <- function(scenario_idx) {
   max_redraws_per_rep <- 100
   
   # =========================================================
-  # Compute Complete Estimate Bivariate
+  # Functions for fitting Complete Estimate and Naive Bivariate 
   # =========================================================
   compute_full <- function(full_data) {
     
@@ -162,10 +265,18 @@ run_ORB <- function(scenario_idx) {
       sei      = as.numeric(t(as.matrix(full_data[, c("O1_sei", "O2_sei")])))
     )
     
+
+    # IDEA: we want to see the results a statistician would get if there was NO ORB
+    # of course also this smart statistician would need to estimate rho_w with pearson 
+    # and let rma.mv estimate tau and rho_b
+
+    # To go back to the oracle benchmark, use cov12 <- rho_w * ... (true value).
+    rho_hat_full <- cor(full_data$O1_yi, full_data$O2_yi)
+
     V_list <- lapply(1:K, function(j) {
       v1 <- full_data$O1_sei[j]^2
       v2 <- full_data$O2_sei[j]^2
-      cov12 <- rho_w * sqrt(v1) * sqrt(v2)
+      cov12 <- rho_hat_full * sqrt(v1) * sqrt(v2)
       matrix(c(v1, cov12, cov12, v2), 2, 2)
     })
     
@@ -178,8 +289,12 @@ run_ORB <- function(scenario_idx) {
                       struct = "UN",
                       data = res_biv_long,
                       method = "REML",
-                      tau2 = NULL,
-                      rho = NULL)
+                      tau2 = NULL,   # tau2_1, tau2_2 estimated
+                      rho = NULL,    # rho_B estimated
+                      control = list(stepadj = 0.1,
+                                     rel.tol = 1e-5, 
+                                     maxiter = 200)
+)
     
     list(
       biv = c(est = res_biv$beta[1],
@@ -188,6 +303,60 @@ run_ORB <- function(scenario_idx) {
     )
   }
   
+
+
+  compute_naive <- function(obs_data){
+
+        observed_uni <- obs_data[!is.na(obs_data$O1_yi), ] # ...
+        K_observed <- nrow(observed_uni)
+        
+        complete_cases <- which(!is.na(observed_uni$O1_yi) & !is.na(observed_uni$O2_yi))
+        n_complete_pairs <- length(complete_cases)
+        
+        # outcome 2 is always reported and the redraw rule for the DGP gives at least 4 reported
+        # studies, so there are always at least 4 complete pairs
+        rho_hat <- cor(observed_uni$O1_yi[complete_cases], observed_uni$O2_yi[complete_cases])
+                
+        res_naive_biv_long <- data.frame(
+          Study_id = rep(observed_uni$Study_id, each = 2),
+          outcome = factor(rep(c("O1", "O2"), times = K_observed)),
+          yi = as.numeric(t(as.matrix(observed_uni[, c("O1_yi", "O2_yi")]))),
+          sei = as.numeric(t(as.matrix(observed_uni[, c("O1_sei", "O2_sei")]))))
+        
+        V_list <- lapply(1:K_observed, function(j) {
+          
+          v1 <- observed_uni$O1_sei[j]^2
+          v2 <- observed_uni$O2_sei[j]^2
+          cov12 <- rho_hat * sqrt(v1) * sqrt(v2)
+          matrix(c(v1, cov12,
+                   cov12, v2), 2, 2)
+        })
+        
+        V_naive <- as.matrix(Matrix::bdiag(V_list))
+        
+        res_naive_biv <- rma.mv(
+          yi,
+          V = V_naive,
+          mods = ~ outcome - 1,
+          random = ~ outcome | Study_id,
+          struct = "UN",
+          tau2 = NULL,
+          rho = NULL,
+          data = res_naive_biv_long,
+          method = "REML",
+          control = list(stepadj = 0.1, 
+                         rel.tol = 1e-5,
+                         maxiter = 200)
+        )
+        
+        list(
+          est = as.numeric(res_naive_biv$beta[1]),
+          ci_l = as.numeric(res_naive_biv$ci.lb[1]),
+          ci_u = as.numeric(res_naive_biv$ci.ub[1]),
+          n_complete_pairs = n_complete_pairs,
+          rho_hat = rho_hat
+        )
+  }
   # =========================================================
   # Main loop
   # =========================================================
@@ -219,15 +388,15 @@ run_ORB <- function(scenario_idx) {
                                n_arm = 50)
         
         n_reported <- sum(!is.na(obs_data$O1_yi))
-        
-        # Admissible dataset
-        if (n_reported >= 4) {
+        n_missing  <- sum(is.na(obs_data$O1_yi))
+
+        if (n_reported >= 4 && n_missing >= 1) {
           break
         }
         
         n_redraws <- n_redraws + 1
         
-        # Avoid an infinite loop in extremely difficult scenarios
+        # Avoid an infinite loop in extremely difficult scenarios, it will never happen c'mon
         if (n_redraws >= max_redraws_per_rep) {
           stop("Maximum number of redraws exceeded.")
         }
@@ -245,7 +414,7 @@ run_ORB <- function(scenario_idx) {
       full_res <- tryCatch(
         compute_full(full_data),
         error = function(e) {
-          message("Full-data analysis failed: ", conditionMessage(e))
+          log_error("Full fit", e)
           NULL
         }
       )
@@ -255,77 +424,14 @@ run_ORB <- function(scenario_idx) {
       # -----------------------------------------------------
       # 2. NAIVE (always from reported data)
       # -----------------------------------------------------
-      naive_res <- tryCatch({
-        
-        observed_uni <- obs_data[!is.na(obs_data$O1_yi), ]
-        K_observed <- nrow(observed_uni)
-        
-        complete_cases <- which(!is.na(observed_uni$O1_yi) & !is.na(observed_uni$O2_yi))
-        n_complete_pairs <- length(complete_cases)
-        
-        # Correlation used for the naive analysis
-        if (n_complete_pairs >= 4) {
-          
-          rho_hat <- cor(observed_uni$O1_yi[complete_cases],
-                         observed_uni$O2_yi[complete_cases])
-          
-          rho_hat_fallback <- FALSE
-        } else {
-          rho_hat <- rho_w
-          rho_hat_fallback <- TRUE
+      naive_res <- tryCatch(
+        compute_naive(obs_data),
+        error = function(e) {
+          log_error("Naive fit", e)
+          list(est = NA_real_, ci_l = NA_real_, ci_u = NA_real_,
+               n_complete_pairs = NA_integer_, rho_hat = NA_real_)
         }
-        
-        res_naive_biv_long <- data.frame(
-          Study_id = rep(observed_uni$Study_id, each = 2),
-          outcome = factor(rep(c("O1", "O2"), times = K_observed)),
-          yi = as.numeric(t(as.matrix(observed_uni[, c("O1_yi", "O2_yi")]))),
-          sei = as.numeric(t(as.matrix(observed_uni[, c("O1_sei", "O2_sei")]))))
-        
-        V_list <- lapply(1:K_observed, function(j) {
-          
-          v1 <- observed_uni$O1_sei[j]^2
-          v2 <- observed_uni$O2_sei[j]^2
-          cov12 <- rho_w * sqrt(v1) * sqrt(v2)
-          matrix(c(v1, cov12,
-                   cov12, v2), 2, 2)
-        })
-        
-        V_naive <- as.matrix(Matrix::bdiag(V_list))
-        
-        res_naive_biv <- rma.mv(
-          yi,
-          V = V_naive,
-          mods = ~ outcome - 1,
-          random = ~ outcome | Study_id,
-          struct = "UN",
-          tau2 = NULL,
-          rho = rho_hat,
-          data = res_naive_biv_long,
-          method = "REML",
-          control = list(rel.tol = 1e-5,
-                         maxiter = 200)
-        )
-        
-        list(
-          est = as.numeric(res_naive_biv$beta[1]),
-          ci_l = as.numeric(res_naive_biv$ci.lb[1]),
-          ci_u = as.numeric(res_naive_biv$ci.ub[1]),
-          n_complete_pairs = n_complete_pairs,
-          rho_hat = rho_hat,
-          rho_hat_fallback = rho_hat_fallback
-        )
-        
-      }, error = function(e) {
-        
-        message("Naive analysis failed: ", conditionMessage(e))
-        
-        list(est = NA_real_,
-             ci_l = NA_real_,
-             ci_u = NA_real_,
-             n_complete_pairs = NA_integer_,
-             rho_hat = NA_real_,
-             rho_hat_fallback = NA)
-      })
+      )
       
       naive_success <- is.finite(naive_res$est) &&
         is.finite(naive_res$ci_l) &&
@@ -341,7 +447,7 @@ run_ORB <- function(scenario_idx) {
                           "O1_sei",
                           "n_total"),
         error = function(e) {
-          message("SE imputation failed: ", conditionMessage(e))
+          log_error("SE imputation", e)
           NULL
         }
       )
@@ -357,7 +463,7 @@ run_ORB <- function(scenario_idx) {
                                     se_col = "O1_sei",
                                     m = M_imputations),
           error = function(e) {
-            message("Univariate imputation failed: ", conditionMessage(e))
+            log_error("Univariate imputation", e)
             NULL
           }
         )
@@ -384,7 +490,7 @@ run_ORB <- function(scenario_idx) {
                                    tau2_val = NULL,
                                    m = M_imputations),
           error = function(e) {
-            message("Bivariate imputation failed: ", conditionMessage(e))
+            log_error("Bivariate imputation", e)
             NULL
           }
         )
@@ -412,7 +518,6 @@ run_ORB <- function(scenario_idx) {
         
         n_complete_pairs = naive_res$n_complete_pairs,
         
-        rho_hat_fallback = naive_res$rho_hat_fallback,
         
         # -----------------------------
         # Full
@@ -452,12 +557,13 @@ run_ORB <- function(scenario_idx) {
         # -----------------------------
         u_ess = as.numeric(adj_uni["ess"]),
         b_ess = as.numeric(adj_biv["ess"]),
+        u_f   = as.numeric(adj_uni["fail"]),
         b_f   = as.numeric(adj_biv["fail"])
       )
       output_row
     }, error = function(e) {
       
-      message("Unexpected repetition-level error: ", conditionMessage(e))
+      log_error("Unexpected repetition-level error", e)
       
       n_unexpected_failures <<- n_unexpected_failures + 1
       
@@ -573,6 +679,11 @@ run_ORB <- function(scenario_idx) {
     N_Eligible = n_eligible,
     N_Attempts = n_attempts,
     N_Unexpected_Failures = n_unexpected_failures,
+    N_Errors = length(error_log),
+    Error_Log = if (length(error_log) == 0) "" else {
+      tb <- sort(table(error_log), decreasing = TRUE)
+      paste0(names(tb), " (x", as.integer(tb), ")", collapse = " | ")
+    },
     N_Redraws = sum(res_df$n_redraws),
     N_Repeated_Redraw = sum(res_df$n_redraws > 0),
     Prop_Redrawn = mean(res_df$n_redraws > 0),
@@ -661,31 +772,39 @@ run_ORB <- function(scenario_idx) {
     # Additional diagnostics
     # -----------------------------
     
-    Prop_Rho_Fallback = mean(res_df$rho_hat_fallback, na.rm = TRUE),
     Mean_Complete_Pairs = mean(res_df$n_complete_pairs,na.rm = TRUE),
     Mean_ESS_Uni = mean(res_df$u_ess, na.rm = TRUE),
     Mean_ESS_Biv = mean(res_df$b_ess, na.rm = TRUE),
+    Mean_Failed_Imputations_Uni = mean(res_df$u_f, na.rm = TRUE),
     Mean_Failed_Imputations_Biv = mean(res_df$b_f, na.rm = TRUE)
   )
   
   saveRDS(summary_row, file = output_file)
+
+  message("scenario ", scenario_idx, " saved")
   return(NULL)
 }
 
 
 # Using native mclapply at scenario level to eliminate data transfer friction
-mclapply(
+invisible ( mclapply(
   X = 1:total_scenarios,
   FUN = run_ORB,
   mc.cores = n_cores,
   mc.preschedule = FALSE # CRITICAL: Dynamic balancing so slow scenarios don't stall cores
-)
+) )
 
 # save data
 cat("\nAll scenario files calculated. Merging to master data frame... ")
 all_files <- list.files(save_dir, pattern = "scenario_.*\\.rds", full.names = TRUE)
-final_metrics_df <- do.call(rbind, lapply(all_files, readRDS))
-write_csv(final_metrics_df,  file.path(out_dir, "data_simulation_test.csv"))
+final_metrics_df <- dplyr::bind_rows(lapply(all_files, readRDS)) 
+write_csv(final_metrics_df, file.path(out_dir, paste0("data_simulation_", run_tag, ".csv")))
+
+
+if (nrow(final_metrics_df) != total_scenarios)
+  warning("missing scenarios: ", total_scenarios - nrow(final_metrics_df))
+
+
 cat("Complete!\n")
 
 
