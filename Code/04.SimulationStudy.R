@@ -26,25 +26,22 @@ M_imputations <- 200
 n_cores       <- 48
 
 # create folder to save the folders containing each scenario
-
 # so the idea is: 
-
 # /Data
 ### --> Sim_results 
 ###         ----> run.tag.1 (e.g. correctly specified)
 ###                   --------> scenario 1
 ###                   ---------> ...
 ###                
-###         ----> run.tag.2 (e.g. delta wrongly spec)
+###         ----> run.tag.2 (e.g. delta wrongly specified)
 ###                   --------> scenario 1
 ###                   ---------> ...
 ###
-###         ----> run.tag.1 (e.g. rho )
+###         ----> run.tag.1 (e.g. different rho)
 ###                   --------> scenario 1
 ###                   ---------> ...
 ### --> Sim_summary 
-###         ---> corrsponding csv files 
-
+###         ---> corresponding csv files 
 
 
 # ---------------------------------------------------------
@@ -55,7 +52,7 @@ n_cores       <- 48
 run_type <- "tryout"   # "tryout", "full_grid", "misspecified_delta", "different_rhos"
 
 # one folder per run
-run_tag <- paste0(run_type, "_2026-09-18")
+run_tag <- paste0(run_type, "_", Sys.Date())
 
 # create folder to save each scenario
 save_dir <- file.path("Data", "Sim_results", run_tag)
@@ -69,7 +66,7 @@ if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
 
 scenarios_grid <- switch (run_type, 
                           "tryout" = expand.grid(
-                            K           = c(25),
+                            K           = c(6, 12, 25),
                             p1          = c(0.2),
                             tau2_val    = c(0, 0.02, 0.06, 0.36),
                             theta_1     = c(0.4),
@@ -299,7 +296,7 @@ run_ORB <- function(scenario_idx) {
   
   compute_naive <- function(obs_data){
     
-    observed_uni <- obs_data[!is.na(obs_data$O1_yi), ] # ...
+    observed_uni <- obs_data[!is.na(obs_data$O1_yi), ] 
     K_observed <- nrow(observed_uni)
     
     complete_cases <- which(!is.na(observed_uni$O1_yi) & !is.na(observed_uni$O2_yi))
@@ -326,27 +323,23 @@ run_ORB <- function(scenario_idx) {
     
     V_naive <- as.matrix(Matrix::bdiag(V_list))
     
-    res_naive_biv <- rma.mv(
-      yi,
-      V = V_naive,
-      mods = ~ outcome - 1,
-      random = ~ outcome | Study_id,
-      struct = "UN",
-      tau2 = NULL,
-      rho = NULL,
-      data = res_naive_biv_long,
-      method = "REML",
-      control = list(rel.tol = 1e-5,
-                     iter.max = 200)
-    )
+    res_naive_biv <- rma.mv(yi,
+                            V = V_naive,
+                            mods = ~ outcome - 1,
+                            random = ~ outcome | Study_id,
+                            struct = "UN",
+                            tau2 = NULL,
+                            rho = NULL,
+                            data = res_naive_biv_long,
+                            method = "REML",
+                            control = list(rel.tol = 1e-5,
+                                           iter.max = 200))
     
-    list(
-      est = as.numeric(res_naive_biv$beta[1]),
-      ci_l = as.numeric(res_naive_biv$ci.lb[1]),
-      ci_u = as.numeric(res_naive_biv$ci.ub[1]),
-      n_complete_pairs = n_complete_pairs,
-      rho_hat = rho_hat
-    )
+    list(est = as.numeric(res_naive_biv$beta[1]),
+         ci_l = as.numeric(res_naive_biv$ci.lb[1]),
+         ci_u = as.numeric(res_naive_biv$ci.ub[1]),
+         n_complete_pairs = n_complete_pairs,
+         rho_hat = rho_hat)
   }
   # =========================================================
   # Main loop
@@ -508,7 +501,6 @@ run_ORB <- function(scenario_idx) {
         biv_success = biv_success,
         
         n_complete_pairs = naive_res$n_complete_pairs,
-        
         
         # -----------------------------
         # Full
