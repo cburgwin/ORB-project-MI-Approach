@@ -415,3 +415,110 @@ print(failed_refits)
 saveRDS(failed_refits, file = "Data/failed_refits.rds")
 
 
+
+
+
+
+
+
+
+
+
+############## Number of imputations M (Appendix) #####################
+
+# Bivariate method, log OR and log RR, selection on the z-score and on the
+# effect estimate. Within-study correlation fixed at rho_W = -0.3. tau2_1,
+# tau2_2 and rho_B estimated.
+# One analysis with M = 1000 imputations per measure. The M = 200 curve uses
+# only the first 200 of these imputations.
+
+library(ggplot2)
+
+types_M   <- c("zscore", "effect")
+deltas_ov <- seq(from = 0, to = 1.3, by = 0.1)
+res_ov    <- list()
+measures <- c("OR", "RR")
+
+set.seed(1)
+
+for (m in measures) {
+  mi_ov   <- run_bivariate_imputation(df_topiramate, paste0("log_", m, c(1, 2)), paste0("se_", m, c(1, 2)),
+                                      rho_w = -0.3, tau2_val = NULL, rho_b = NULL, m = 1000)
+  fits_ov <- fit_imputations_biv(mi_ov)
+
+  for (mm in c(200, 1000)) {
+    mi_sub <- mi_ov
+    mi_sub$imp_draws <- mi_ov$imp_draws[1:mm, , drop = FALSE]   # first mm imputations
+    for (type in types_M) {
+      for (delta in deltas_ov) {
+        tmp <- adj_bivariate(mi_sub, delta = delta, select_type = type,
+                             track.failed.proportion = FALSE, track.ess = FALSE,
+                             fits = fits_ov[1:mm])
+        res_ov[[length(res_ov) + 1]] <- data.frame(Measure = paste0("log ", m), M = mm,
+                                                   Select_type = type, Selection = delta,
+                                                   Outcome = tmp$Outcome, Estimate = tmp$Estimate,
+                                                   CI_Lower = tmp$CI_Lower, CI_Upper = tmp$CI_Upper)
+      }
+    }
+  }
+}
+
+dat_ov <- dplyr::bind_rows(res_ov) %>%
+  mutate(M = factor(M, levels = c(200, 1000)),
+         Measure = factor(Measure, levels = c("log OR", "log RR")),
+         Outcome = factor(ifelse(Outcome == "O1", "50% Seizure Reduction", "Seizure Freedom"),
+                          levels = c("50% Seizure Reduction", "Seizure Freedom")),
+         Type = factor(ifelse(Select_type == "zscore", "Selection on z-score", "Selection on estimate"),
+                       levels = c("Selection on z-score", "Selection on estimate")))
+write_csv(dat_ov, "Data/data_M_overlay.csv")
+
+# rows = measure x outcome, columns = selection type
+ggplot(dat_ov, aes(x = Selection, y = Estimate, colour = M, fill = M)) +
+  geom_ribbon(aes(ymin = CI_Lower, ymax = CI_Upper), alpha = 0.12, colour = NA) +
+  geom_line(linewidth = 0.9) +
+  facet_grid(Measure + Outcome ~ Type) +
+  scale_colour_manual(values = c("200" = "#D55E00", "1000" = "#0072B2")) +
+  scale_fill_manual(values = c("200" = "#D55E00", "1000" = "#0072B2")) +
+  labs(x = expression("Selection weight"~delta), y = "Adjusted estimate",
+       colour = "Imputations M", fill = "Imputations M") +
+  theme_bw(base_size = 12) +
+  theme(legend.position = "bottom", panel.grid.minor = element_blank())
+
+ggsave("Paper/figures/App_M_convergence.png", width = 9, height = 11)
+
+# largest difference between the two curves, for the text
+dat_ov |>
+  select(M, Measure, Type, Selection, Outcome, Estimate) |>
+  tidyr::pivot_wider(names_from = M, values_from = Estimate, names_prefix = "M_") |>
+  group_by(Measure, Outcome, Type) |>
+  summarise(max_abs_diff = round(max(abs(M_200 - M_1000)), 3), .groups = "drop")
+
+
+
+# -------------------------------------------------------------------------
+# Justification paragraph
+# -------------------------------------------------------------------------
+# For computational reasons, the simulation uses M = 200 imputations instead of
+# the M = 1000 used in the application. See Appendix to check that this reduction does not
+# change the results.
+
+
+# --- In the appendix add this:
+# To check that this reduction does not change the results, the bivariate
+# adjustment was applied to the topiramate data with M = 1000 imputations and
+# the adjusted estimate recomputed from the first 200 of them, on the log OR
+# and on the log RR scale. The within-study correlation was fixed at
+# rho_W = -0.3, while the between-study variances and correlation were
+# estimated. Both outcomes were considered, 50% seizure reduction (1 study
+# unreported) and seizure freedom (6 of 12 unreported), with selection on the
+# z-score and on the effect estimate, for delta from 0 to 1.3.
+#
+# Figure caption: Adjusted estimate (line) and 95% confidence interval (band) as
+# a function of the selection weight delta, computed from the first 200 (orange)
+# and from all 1000 (blue) imputations of the same analysis. 
+#
+# For 50% seizure reduction the two curves coincide on both scales (largest
+# difference 0.06, against confidence intervals about 0.6 to 0.7 wide). For
+# seizure freedom they overlap up to delta = 0.5 and differ by at most 0.12 at
+# larger delta, well within confidence intervals 1.3 to 1.8 wide.
+# M = 200 therefore leads to the same conclusions as M = 1000.
