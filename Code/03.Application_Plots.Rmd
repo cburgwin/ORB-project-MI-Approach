@@ -1,7 +1,6 @@
 ---
 title: "03.Application_plots.Rmd"
 author: "Cora Burgwinkel"
-date: "2026-05-21"
 output: html_document
 ---
 
@@ -14,6 +13,9 @@ library(dplyr)
 library(tidyr)
 library(tidyverse)
 library(ggplot2)
+library(MASS)
+library(Matrix)
+library(metafor)
 ```
 
 # Plot Univariate for seizure reduction
@@ -59,7 +61,7 @@ ggplot(data = final_uni_df_O1, aes(x = as.numeric(Selection))) +
         legend.title = element_text(size = 16),
         strip.text = element_text(size = 16))
 
-ggsave("Paper/figures/App_Uni_REM_O1.png", width = 10, height = 10)
+ggsave("Plots_Paper/App_Uni_REM_O1.png", width = 10, height = 10)
 ```
 
 
@@ -106,7 +108,7 @@ ggplot(data = final_uni_df_O2, aes(x = as.numeric(Selection))) +
         legend.title = element_text(size = 16),
         strip.text = element_text(size = 16))
 
-ggsave("Paper/figures/App_Uni_REM_O2.png", width = 10, height = 10)
+ggsave("Plots_Paper/App_Uni_REM_O2.png", width = 10, height = 10)
 ```
 
 
@@ -186,7 +188,7 @@ ggplot(data = final_biv_df_O1, aes(x = as.numeric(Selection))) +
          legend.title = element_text(size = 16),
          strip.text = element_text(size = 16)) 
 
-ggsave("Paper/figures/App_Corr_12_mv_REM_O1.png", width = 10, height = 10)
+ggsave("Plots_Paper/App_Corr_12_mv_REM_O1.png", width = 10, height = 10)
 
 ```
 
@@ -194,20 +196,18 @@ ggsave("Paper/figures/App_Corr_12_mv_REM_O1.png", width = 10, height = 10)
 
 ```{r, fig.width = 10, fig.height = 10}
 
-plot_biv_df <- read.csv2("Data/data_biv_df.csv", sep = ",")
-
 # only plot outcome two
-plot_biv_df <- subset(plot_biv_df, Outcome == "O2")
+plot_biv_df_O2 <- subset(plot_biv_df, Outcome == "O2")
 
 # bring data into wide format
-naive_df <- plot_biv_df %>%
+naive_df <- plot_biv_df_O2 %>%
  filter(Approach == "Naive estimate") %>%
  dplyr::select(Outcome, Measure, Selection, Correlation,
         Estimate_unadjusted = Estimate,
         CI_unadjusted_lower = CI_Lower,
         CI_unadjusted_upper = CI_Upper)
  
-adjusted_df <- plot_biv_df %>%
+adjusted_df <- plot_biv_df_O2 %>%
  filter(Approach != "Naive estimate") %>%
  # Create the Z_score column your plot expects (TRUE if zscore, FALSE if effect)
  mutate(Z_score = ifelse(Approach == "Bivariate Selection on zscore", TRUE, FALSE)) %>%
@@ -266,7 +266,7 @@ ggplot(data = final_biv_df, aes(x = as.numeric(Selection))) +
          legend.title = element_text(size = 16),
          strip.text = element_text(size = 16))
 
-ggsave("Paper/figures/App_Corr_12_mv_REM_O2.png", width = 10, height = 10)
+ggsave("Plots_Paper/App_Corr_12_mv_REM_O2.png", width = 10, height = 10)
 ```
 
 # Plot Univariate and Multivariate for comparison for seizure reduction
@@ -343,7 +343,7 @@ ggplot(data = plotdf, aes(x = as.numeric(Selection))) +
         legend.title = element_text(size = 16),
         strip.text = element_text(size = 16))
 
-ggsave("Paper/figures/Uni_Multi_Comp_12_REM_05_01.png", width = 10, height = 10)
+ggsave("Plots_Paper/Uni_Multi_Comp_12_REM_01.png", width = 10, height = 10)
 ```
 
 
@@ -421,12 +421,12 @@ ggplot(data = plotdf, aes(x = as.numeric(Selection))) +
         legend.title = element_text(size = 16),
         strip.text = element_text(size = 16))
 
-ggsave("Paper/figures/Uni_Multi_Comp_12_REM_05.png", width = 10, height = 10)
+ggsave("Plots_Paper/Uni_Multi_Comp_12_REM.png", width = 10, height = 10)
 ```
 
-## create forest plot
+# Create forest plot for comparison of our approaches
 
-```{r}
+```{r, warning = FALSE}
 # read data in from Table_2.rds
 data <- readRDS("Data/Table_2.rds")
 
@@ -471,11 +471,11 @@ dat <- data %>%
     est = as.numeric(est)
   ) %>%
   #select/reorder the final columns
-  select(Model, Effect, Approach, Outcome, est, lcl, ucl)
+  dplyr::select(Model, Effect, Approach, Outcome, est, lcl, ucl)
 ```
 
 
-```{r}
+```{r, warning = FALSE}
 # Ordering
 dat <- dat %>%
   mutate(
@@ -502,7 +502,7 @@ dat$Label <- factor(dat$Label,
                    levels = rev(unique(dat$Label)))
 ```
 
-```{r, fig.width=10, fig.height=6}
+```{r, warning = FALSE, fig.width=10, fig.height=6}
 
 # have enough space between imputation models, otherwise they are plotted on
 # top of each other
@@ -534,6 +534,1913 @@ ggplot(dat,
         axis.text.y = element_text(size = 16, colour = "black"))
 
 
-ggsave("Paper/figures/Forestplot.png", width = 10, height = 6)
+ggsave("Plots_Paper/Forestplot.png", width = 10, height = 6)
 ```
 
+# Create forest plot for comparison to existing methods
+### for seizure freedom
+
+```{r}
+# read data in
+data_topiramate <- data.frame(
+  Study_id = 1:12,
+  Author = c("Ben-Menachem", "Elterman", "Faught", "Guberman", "Korean", 
+             "Privitera", "Rosenfeld", "Sharief", "Tassinari", "Yen", 
+             "Zhang", "Coles"),
+  
+  # Sample Sizes (T = Treated, C = Control)
+  N_t = c(28, 41, 136, 171, 91, 143, 167, 23, 30, 23, 46, 52),
+  N_c = c(28, 45, 45, 92, 86,  47, 42, 24, 30, 23, 40, 51),
+  
+  # Outcome 1: 50% Seizure Reduction
+  T1 = c(12, 16, 54, 77, 45, 58, 86, 8, 14, 11, 22, NA),
+  C1 = c(0, 9, 8, 22, 11, 4, 8, 2, 3, 3, 3, NA),
+  
+  # Outcome 2: Seizure Freedom
+  T2 = c (NA, 4, NA, 10, 7, NA, NA, 2, 0, NA, 0, NA),
+  C2 = c (NA, 2, NA,  2, 1, NA, NA, 0, 0, NA, 0, NA)
+)
+
+
+
+# ORBIT classification
+orbit_to_risk <- c(A = "HR", D = "HR", E = "HR", G = "HR",   # High Risk
+                   C = "LR", F = "LR", H = "LR",             # Low Risk
+                   B = "NR", I = "NR")                       # No Risk
+
+# Seizure Reduction (outcome 1) — from Table 3 Copas et al. 2019
+orbit_code_outcome1 <- c(
+  "Coles"        = "E"
+  # remaining studies fully report seizure reduction -> not in this vector
+)
+
+# Seizure freedom (outcome 2) — from Table 3 Copas et al. 2019
+orbit_code_outcome2 <- c(
+  "Ben-Menachem" = "E",
+  "Faught"       = "E",
+  "Privitera"    = "E",
+  "Rosenfeld"    = "C",
+  "Yen"          = "E",
+   "Coles"  = "E"
+  # remaining studies fully report seizure freedom -> not in this vector
+)
+
+data_topiramate$orbit_out1 <- orbit_to_risk[orbit_code_outcome1[data_topiramate$Author]]
+data_topiramate$orbit_out2 <- orbit_to_risk[orbit_code_outcome2[data_topiramate$Author]]
+
+```
+
+```{r}
+compute_effects <- function(data) {
+   # --------------------------------------
+  # OUTCOME 1: Seizure Reduction
+  # --------------------------------------
+  
+   # Log Relative Risk
+  data <- escalc(measure = "RR", 
+                 ai = T1, 
+                 n1i = N_t, 
+                 ci = C1, 
+                 n2i = N_c, 
+                 data = data, 
+                 var.names = c("log_RR1", "var_RR1"), 
+                 append = TRUE,
+                 add = 0.5, 
+                 to = "only0")
+  # Convert variance to SE
+  data$se_RR1 <- sqrt(data$var_RR1)
+  
+  # --------------------------------------
+  # OUTCOME 2: Seizure Freedom
+  # --------------------------------------
+  
+  # Log Relative Risk
+  data <- escalc(measure = "RR", 
+                 ai = T2, 
+                 n1i = N_t, 
+                 ci = C2, 
+                 n2i = N_c, 
+                 data = data, 
+                 var.names = c("log_RR2", "var_RR2"),
+                 append = TRUE,
+                 add = 0.5, 
+                 to = "only0")
+  # Convert variance to SE
+  data$se_RR2 <- sqrt(data$var_RR2)
+  
+  data_out <- data |> 
+    dplyr::mutate(n_total = N_t + N_c) |> 
+    dplyr::select(Study_id,
+                  orbit_out1,
+                  orbit_out2,
+                  n_total, 
+                  log_RR1, 
+                  se_RR1,
+                  log_RR2, 
+                  se_RR2)  
+  
+  return(data_out)
+}
+
+data_topiramate <- compute_effects(data_topiramate)
+
+# slightly different function than the one in 00.functions.R
+impute_missing_se <- function(data, 
+                              target_theta_col, 
+                              target_se_col) {
+  
+  # Identify reported and unreported indices
+  rep_idx <- which(!is.na(data[[target_theta_col]]))
+  unrep_idx <- which(is.na(data[[target_theta_col]]))
+  
+  # If there are no missing values for this outcome, return data 
+  if(length(unrep_idx) == 0) {
+    return(data)
+  }
+  
+  # Calculate k_hat using only the reported studies (Eq. 6)
+  # Precision is the inverse of the variance (1 / SE^2)
+  precisions <- 1 / (data[[target_se_col]][rep_idx]^2)
+  k_hat <- sum(precisions) / sum(data$n_total[rep_idx])
+  
+  # Impute the missing standard errors
+  data[[target_se_col]][unrep_idx] <- sqrt(1 / (k_hat * data$n_total[unrep_idx]))
+  
+  return(data)
+}
+
+data_topiramate <- impute_missing_se(
+  data = data_topiramate, 
+  target_theta_col = "log_RR1", 
+  target_se_col = "se_RR1"
+)
+
+data_topiramate <- impute_missing_se(
+  data = data_topiramate, 
+  target_theta_col = "log_RR2", 
+  target_se_col = "se_RR2"
+)
+```
+
+```{r}
+# -------------------------------------------------------------------
+# Copas ORB Selection Model for Benefit Outcomes (Copas et al.)
+# -------------------------------------------------------------------
+copas_orb_adjustment <- function(data, 
+                                 theta_col = "log_RR2", 
+                                 se_col    = "se_RR2", 
+                                 risk_col  = "orbit_out2", 
+                                 alpha     = 0.05) {
+  
+  z_alpha <- qnorm(1 - alpha / 2)
+  
+  reported <- data[!is.na(data[[theta_col]]), ]
+  w_rep    <- 1 / (reported[[se_col]]^2)
+  theta_U  <- sum(w_rep * reported[[theta_col]]) / sum(w_rep)
+  se_theta <- sqrt(1 / sum(w_rep))
+  
+  hr_studies <- data[is.na(data[[theta_col]]) & (!is.na(data[[risk_col]]) & data[[risk_col]] == "HR"), ]
+  sigma_hr   <- hr_studies[[se_col]]
+  
+  if (length(sigma_hr) == 0) {
+    return(data.frame(
+      estimate_logRR = theta_U,
+      ci_lower_logRR = theta_U - z_alpha * se_theta,
+      ci_upper_logRR = theta_U + z_alpha * se_theta,
+      estimate_RR    = exp(theta_U),
+      ci_lower_RR    = exp(theta_U - z_alpha * se_theta),
+      ci_upper_RR    = exp(theta_U + z_alpha * se_theta),
+      p_value        = 2 * (1 - pnorm(abs(theta_U / se_theta)))
+    ))
+  }
+  
+  log_lik_B <- function(theta) {
+    unadj_term <- - ((theta - theta_U)^2) / (2 * se_theta^2)
+    p_non_sig  <- pnorm(z_alpha - theta / sigma_hr) - pnorm(-z_alpha - theta / sigma_hr)
+    p_non_sig  <- pmax(p_non_sig, 1e-15)
+    unadj_term + sum(log(p_non_sig))
+  }
+  
+  opt     <- optimize(log_lik_B, interval = c(-10, 10), maximum = TRUE)
+  theta_B <- opt$maximum
+  max_ll  <- opt$objective
+  
+  lr_target <- function(theta) 2 * (max_ll - log_lik_B(theta)) - z_alpha^2
+  
+  ci_lower <- tryCatch({
+    uniroot(lr_target, interval = c(-10, theta_B))$root
+  }, error = function(e) theta_B - z_alpha * se_theta)
+  
+  ci_upper <- tryCatch({
+    uniroot(lr_target, interval = c(theta_B, 10))$root
+  }, error = function(e) theta_B + z_alpha * se_theta)
+  
+  p_val <- 1 - pchisq(pmax(0, 2 * (max_ll - log_lik_B(0))), df = 1)
+  
+  return(data.frame(
+    estimate_logRR = theta_B,
+    ci_lower_logRR = ci_lower,
+    ci_upper_logRR = ci_upper,
+    estimate_RR    = exp(theta_B),
+    ci_lower_RR    = exp(ci_lower),
+    ci_upper_RR    = exp(ci_upper),
+    p_value        = p_val
+  ))
+}
+
+copas_result <- copas_orb_adjustment(data_topiramate)
+```
+
+
+
+
+```{r}
+# read data in, "unrep" for unreported studies
+data_topiramate_unrep <- data.frame(
+  Study_id = 1:12,
+  Author = c("Ben-Menachem", "Elterman", "Faught", "Guberman", "Korean", 
+             "Privitera", "Rosenfeld", "Sharief", "Tassinari", "Yen", 
+             "Zhang", "Coles"),
+  
+  # Sample Sizes (T = Treated, C = Control)
+  N_t = c(28, 41, 136, 171, 91, 143, 167, 23, 30, 23, 46, 52),
+  N_c = c(28, 45, 45, 92, 86,  47, 42, 24, 30, 23, 40, 51),
+  
+  # Outcome 1: 50% Seizure Reduction
+  T1 = c(12, 16, 54, 77, 45, 58, 86, 8, 14, 11, 22, "unrep"),
+  C1 = c(0, 9, 8, 22, 11, 4, 8, 2, 3, 3, 3, "unrep"),
+  
+  # Outcome 2: Seizure Freedom
+  T2 = c ("unrep", 4, "unrep", 10, 7, "unrep", "unrep", 2, 0, "unrep", 0, "unrep"),
+  C2 = c ("unrep", 2, "unrep",  2, 1, "unrep", "unrep", 0, 0, "unrep", 0, "unrep")
+)
+
+
+# function from github
+#The function reORBadj adjusts for ORB according to the selection model framework developed in this project
+#It can be seen as an extension of the Copas et al. (2019) methodology, for the random effects model, and without
+#the need for an ORBIT classification of unreported study outcomes.
+
+#Inputs
+#a - vector for observed counts in the treatment arm for each study in the meta-analysis, unreported study outcomes have entry "unrep"
+#c - vector for observed counts in the control arm for each study in the meta-analysis, unreported study outcomes have entry "unrep"
+#mu1 - vector for observed means in the treatment arm for each study in the meta-analysis, unreported study outcomes have entry "unrep"
+#mu2 - vector for observed means in the control arm for each study in the meta-analysis, unreported study outcomes have entry "unrep"
+#sd1 - vector for observed standard errors in the treatment arm for each study in the meta-analysis, unreported study outcomes have entry "unrep"
+#sd2 - vector for observed standard errors in the control arm for each study in the meta-analysis, unreported study outcomes have entry "unrep"
+#y - vector for observed treatment effects (normally distributed, eg log RR) for each study in the meta-analysis, unreported study outcomes have entry "unrep"
+#s - vector for observed standard errors of the the treatment effect for each study in the meta-analysis, unreported study outcomes have entry "unrep"
+#n1 - vector for sample sizes in treatment arm, must be reported for all studies
+#n2 - vector for sample sizes in control arm, must be reported for all studies
+#outcome - string character "beneficial"
+#init_param - vector of length two, containing the values to be used for initialization of the joint optimization of the treatment effect and heterogeneity variance
+#alpha_ben - value for desired confidence level, e.g., 0.05
+#alpha_ben_one.sided - if TRUE, one sided significance is used, FALSE for two-sided
+#true.SE - if the true standard errors are known, valid only for the case in which we have y and s as inputs; in this case the SE are not imputed
+#LR.CI - if TRUE, calculates the profile likelihood confidence intervals using the likelihood ratio statistic
+#Wald.CI - if TRUE, calculates Wald CI 
+#selection.benefit - string factor specifying the selection function to be used for the ORB adjustment 
+#                  "Constant-constant" W_A in manuscript
+#                  "Constant-continous" W_B in manuscript
+#                  "Continous-constant" W_C in manuscript
+#                 "Continous-continous" W_D in manuscript
+#                  "DGM" W_DGM in manuscript
+#rho1 - parameter for continuous part of selection function W_B in manuscript, "Constant-continous"
+#rho2 - parameter for continuous part of selection function W_C in manuscript, "Continous-constant"
+#opt_method - string character for the desired optimizatin method, e.g., "L-BFGS-B"
+#lower - vector of length 2 for the lower bound of the optimization if "L-BFGS-B" is used
+#upper - vector of length 2 for the upper bound of the optimization if "L-BFGS-B" is used
+#gam - parameter used in DGM and consequently to be used in DGM selection function for correct model specification
+
+#Outputs
+#mu_unadjusted = naive estimate of treatment effect, no ORB adjustment
+#LR_mu_unadjusted_low = lower bound of PL CI for naive estimate of treatment effect
+#LR_mu_unadjusted_up = upper bound of PL CI for naive estimate of treatment effect
+#CI_unadjusted_low_WALD = lower bound of Wald CI for naive estimate of treatment effect
+#CI_unadjusted_up_WALD = upper bound of Wald CI for naive estimate of treatment effect
+#mu_adjusted_benefit = ORB-adjusted estimate of treatment effect
+#LR_mu_adjusted_low = lower bound of PL CI for ORB-adjusted estimate of treatment effect
+#LR_mu_adjusted_up = upper bound of PL CI for ORB-adjusted estimate of treatment effect
+#CI_adjusted_benefit_low_WALD = lower bound of Wald CI for ORB-adjusted estimate of treatment effect
+#CI_adjusted_benefit_up_WALD = upper bound of Wald CI for ORB-adjusted estimate of treatment effect
+#tau_squared_unadjusted = naive estimate of heterogeneity variance
+#LR_tau_squared_unadjusted_low = lower bound of PL CI for naive estimate of heterogeneity variance
+#LR_tau_squared_unadjusted_up = upper bound of PL CI for naive estimate of heterogeneity variance
+#tau_squared_adjusted = ORB-adjusted estimate of heterogeneity variance
+#LR_tau_squared_adjusted_low = lower bound of PL CI for ORB-adjusted estimate of heterogeneity variance
+#LR_tau_squared_adjusted_up = upper bound of PL CI for ORB-adjusted estimate of heterogeneity variance
+#average_sigma_squared_unadjusted = average of imputed and reported variances with naive estimation
+#sigma_squared_average_adjusted = average of imputed and reported variances with ORB-adjusted estimation
+
+
+reORBadj <- function(a=NULL, 
+                     c=NULL,
+                     mu1=NULL, 
+                     mu2=NULL, 
+                     sd1=NULL, 
+                     sd2=NULL,
+                     y=NULL, 
+                     s=NULL,
+                     n1,
+                     n2,
+                     outcome,
+                     init_param,
+                     alpha_ben=NULL,
+                     alpha_ben_one.sided = TRUE,
+                     true.SE=NULL, 
+                     LR.CI = FALSE,
+                     Wald.CI = FALSE,
+                     selection.benefit = "Copas.oneside",
+                     rho1=3,
+                     rho2=3,
+                     opt_method="L-BFGS-B",
+                     lower = c(-5, 0.00001),
+                     upper = c(5,5),
+                     gam = 1.5
+) {
+  
+  #Can take in binary counts and calculate log RR: a, c
+  #Means and calculate differences in means: y1, y2, sd1, sd2
+  #Directly normally distributed effect measure: y, s
+  
+  #Beneficial outcome, i.e., positive direction of treatment
+  
+  #Selection functions for the probability of reporting as a function of pvalue
+  #SS: Constant-constant
+  #ST: Constant-continous
+  #TS: Continous-constant
+  #TT: Continous-continous
+  #DGM: Corresponds to the function to use to generate ORB
+  
+  #If alpha_ben_one.sided=TRUE, we use the one-sided threshold 
+  sel.ben <- selection.benefit
+  
+  #Parameters for continuous parts of selection functions
+  rho1 <- rho1
+  rho2 <- rho2
+  
+  #Parameter used in DGM and consequently to be used in DGM selection function for correct model specification
+  gam <- gam
+  
+  #If FALSE, we do not calculate the Wald CI - they are numerically unstable sometimes
+  if (Wald.CI){
+    my.hessian <- TRUE
+  } else{
+    my.hessian <- FALSE
+  }
+  
+  #Optimization method
+  method <- opt_method
+  lower <- lower
+  upper <- upper
+  
+  
+  #Binary input data to calculate log RR
+  if (!is.null(a) & !is.null(c)){
+    
+    #Reported outcomes
+    #Indecies where we do not have unrepoted outcomes, i.e., we have reported outcomes
+    #If we turn C into numeric, the unreported become NA
+    
+    Rep_index <- which(!is.na(as.numeric(a)))
+    HR_index <- which(a == "unrep")
+    
+    # a,c,n1,n2, n values for the reported studies
+    a_rep <- as.numeric(a[Rep_index])
+    c_rep <- as.numeric(c[Rep_index])
+    n1_rep <- as.numeric(n1[Rep_index])
+    n2_rep <- as.numeric(n2[Rep_index])
+    
+    if (length(a_rep == 0) | length(c_rep == 0) > 0){ #Continuity correction
+      
+      a_0_index <- c(which(a_rep == 0), which(c_rep == 0)) #Where the zero cell counts are
+      a_rep[a_0_index] <- a_rep[a_0_index] + 0.5
+      c_rep[a_0_index] <- c_rep[a_0_index] + 0.5
+      n1_rep[a_0_index] <- n1_rep[a_0_index] + 0.5
+      n2_rep[a_0_index] <- n2_rep[a_0_index] + 0.5 #Add 0.5 to the cell counts with 0
+      
+      a_0_both <- which(a_rep == 0.5 & c_rep == 0.5)
+      
+      if (length(a_0_both)>0){
+        
+        a_rep <- a_rep[-a_0_both]
+        c_rep <- c_rep[-a_0_both]
+        n1_rep <- n1_rep[-a_0_both]
+        n2_rep <- n2_rep[-a_0_both]
+        
+      } else {
+        
+        a_rep <- a_rep
+        c_rep <- c_rep
+        n1_rep <- n1_rep
+        n2_rep <- n2_rep
+        
+      }
+      
+    } else {
+      
+      a_rep <- a_rep
+      c_rep <- c_rep
+      n1_rep <- n1_rep
+      n2_rep <- n2_rep
+    }
+    
+    
+    #How many studies are reported?
+    N_rep <- length(Rep_index)
+    
+    #Unreported study sizes, we might have info from n1,n2 or just the total
+    ntot <- as.numeric(n1) + as.numeric(n2)
+    n_HR <- as.numeric(ntot[HR_index])
+    
+    
+    #log RR and standard error
+    logRR <- log((a_rep*n2_rep)/(c_rep*n1_rep))
+    s <- sqrt(((n1_rep - a_rep)/(n1_rep*a_rep)) + ((n2_rep - c_rep)/(n2_rep*c_rep)))
+    sigma_squared <- s^2
+    
+    
+    
+    #Imputed values of sigma squared for the unreported studies
+    #K value based on the reported studies, see Copas et al. (2019)
+    k <- sum(1/sigma_squared)/sum((n1_rep + n2_rep))
+    
+    #Mean differences as input data (continuous)
+    #Same procedure
+    
+  } else if (!is.null(mu1) & !is.null(mu2) & !is.null(sd1) & !is.null(sd2)){
+    
+    Rep_index <- which(!is.na(as.numeric(mu1)))
+    
+    HR_index <- which(mu1 == "unrep")
+      
+    #Unreported study sizes, we might have info from n1,n2 or just the total
+    ntot <- as.numeric(n1) +as.numeric(n2)
+    n_HR <- as.numeric(ntot[HR_index])
+    
+    #mu1,mu2,n1,n2,n values for the reported studies
+    mu1_rep <- as.numeric(mu1[Rep_index])
+    mu2_rep <- as.numeric(mu2[Rep_index])
+    sd1_rep <- as.numeric(sd1[Rep_index])
+    sd2_rep <- as.numeric(sd2[Rep_index])
+    n1_rep <- as.numeric(n1[Rep_index])
+    n2_rep <- as.numeric(n2[Rep_index])
+    
+    #How many studies are reported?
+    N_rep <- length(Rep_index)
+    
+    #Differenece in means
+    #Standard errors given
+    logRR <- mu1_rep - mu2_rep
+    s <- sqrt((as.numeric(sd1_rep)^2)/(as.numeric(n1_rep)) + (as.numeric(sd2_rep)^2)/(as.numeric(n2_rep)))
+    sigma_squared <- s^2
+    
+    k <- sum(1/sigma_squared)/sum((n1_rep + n2_rep))
+    
+    #We directly have the treatment effect and standard error
+    
+  } else if (!is.null(y) & !is.null(s)) {
+    
+    #Indecies where we have the reported outcomes and the unreported HR
+    Rep_index <- which(!is.na(as.numeric(y)))
+    
+    HR_index <- which(y == "unrep")
+    
+    #Observed treatment effect, standard error^2, and sample sizes of reported outcomes
+    logRR <- as.numeric(y[Rep_index])
+    sigma_squared <- (as.numeric(s[Rep_index]))^2
+    n1_rep <- as.numeric(n1[Rep_index])
+    n2_rep <- as.numeric(n2[Rep_index])
+    
+    #Total sample size of unreported outcomes
+    n_HR <- as.numeric(n1[HR_index]) + as.numeric(n2[HR_index])
+    
+    #k estimation, based on reported studies
+    k <- sum(1/sigma_squared)/sum((n1_rep + n2_rep))
+    
+  } else {
+    
+    return("Error: invalid inputs. Input either a and c values or y1,sd1 and y2,sd2 values.")
+  }
+  
+  
+  #Possibility to pass the true SE to the function
+  if (!is.null(true.SE)){
+    
+    sigma_squared_imputed <- (as.numeric(true.SE)[HR_index])^2
+  } else {
+    #Imputed variances for the HR studies
+    #See Copas et al. (2019)
+    sigma_squared_imputed <- 1/(k*n_HR)
+    
+  }
+  
+  #Average sigma squared value that is used when we do not adjust for ORB and when we do
+  sigma_squared_average_unadjusted <- mean(sigma_squared)
+  sigma_squared_average_adjusted <- mean(c(sigma_squared, sigma_squared_imputed))
+  
+  #Unadjusted log-likelihood function to be maximized
+  f.u <- function(params, logRR, sigma_squared) {
+    mu <- params[1]
+    tau_squared <- params[2]
+    if (tau_squared < 0 ){
+      - Inf
+    } else {
+      
+      -(1/2)*sum(log(sigma_squared + tau_squared) + ((logRR - mu)^2)/(sigma_squared + tau_squared))
+    }
+  }
+  
+  #Set initial values for mu and tau_squared
+  init_params <- init_param
+  
+  #Maximize unadjusted function optim()
+  if (method == "L-BFGS-B"){
+    fit.u <- optim(init_params, f.u, logRR = logRR, sigma_squared = sigma_squared,
+                   #method = "Nelder-Mead",
+                   method=method,
+                   lower = lower,
+                   upper = upper,
+                   control = list(fnscale = -1),
+                   hessian=my.hessian)
+  } else {
+        fit.u <- optim(init_params, f.u, logRR = logRR, sigma_squared = sigma_squared,
+                   method = method,
+                   control = list(fnscale = -1),
+                   hessian=my.hessian)
+    
+  }
+  #Return unadjusted mu and tau_squared
+  mle.u <- fit.u$par[1]
+  mle.tau <- max(fit.u$par[2],0)
+  
+  #Beneficial outcome adjustment for ORB
+  
+  if(outcome == "benefit"){
+    
+    z_alpha.copas <- qnorm(1-alpha_ben/2) #two-sided threshold
+    
+    if (alpha_ben_one.sided == TRUE){ #one-sided threshold (reccomended for consistency with simulation process and literature)
+      
+      z_alpha <- qnorm(1-alpha_ben)
+    } else {
+      z_alpha <- qnorm(1-alpha_ben/2)
+    }
+    
+    #Adjusted log-likelihood function for beneficial outcome to be maximized
+    f.adj.b <- function(params, logRR, sigma_squared, sigma_squared_imputed) {
+      mu <- params[1]
+      tau_squared <- params[2]
+      
+      if(tau_squared < 0){
+        - Inf
+      } else {
+        
+        #The contribution from the reported studies is always present
+        -(1/2)*sum(log(sigma_squared + tau_squared) + ((logRR - mu)^2)/(sigma_squared + tau_squared)) +
+          
+          
+          if (length(sigma_squared_imputed) > 0) {
+            
+            if (sel.ben == "Constant.Constant"){
+              
+              #sum(log(pnorm((z_alpha*sqrt(sigma_squared_imputed) - mu)/sqrt(sigma_squared_imputed + tau_squared))))
+              
+              #Probability of reporting
+              SS <- function(y, sigma_squared_imputed, alpha_ben) {
+                
+                p = pnorm(-y/sqrt(sigma_squared_imputed))
+                
+                ifelse(p <= alpha_ben, 
+                       1,
+                       0)
+              }
+              
+              #Integrand
+              integrand <- function(y, mu, tau_squared, sigma_squared_imputed, alpha_ben) {
+                
+                weight <- 1 - SS(y, sigma_squared_imputed, alpha_ben)
+                (1 / sqrt(2 * pi * (sigma_squared_imputed + tau_squared))) * exp(-0.5 * ((y - mu)^2 / (sigma_squared_imputed + tau_squared))) * weight
+              }
+              
+              #log-lik contribution
+              sum(log(sapply(sigma_squared_imputed, function(sigma_sq_imputed) {
+                integrate(function(y) integrand(y, mu, tau_squared, sigma_sq_imputed, alpha_ben), #change here April 2. added Vectorize
+                          lower = -10, upper = 10, subdivisions = 200, stop.on.error=FALSE)$value
+              })))
+              
+            } else if (sel.ben == "Constant.Continous") {
+              #Probability of reporting
+              TS <- function(y, sigma_squared_imputed, alpha_ben) {
+                p = pnorm(-y/sqrt(sigma_squared_imputed))
+                ifelse(p <= alpha_ben, 
+                       1,
+                       (p^(-rho2))/(alpha_ben^(-rho2)))
+              }
+              #Integrand
+              integrand <- function(y, mu, tau_squared, sigma_squared_imputed, alpha_ben) {
+                
+                weight <- 1 - TS(y, sigma_squared_imputed, alpha_ben)
+                (1 / sqrt(2 * pi * (sigma_squared_imputed + tau_squared))) * exp(-0.5 * ((y - mu)^2 / (sigma_squared_imputed + tau_squared))) * weight
+              }
+              
+              #log-lik contribution
+              sum(log(sapply(sigma_squared_imputed, function(sigma_sq_imputed) {
+                integrate(function(y) integrand(y, mu, tau_squared, sigma_sq_imputed, alpha_ben), #change here April 2. added Vectorize
+                          lower = -10, upper = 10, subdivisions = 200, stop.on.error=FALSE)$value
+              })))
+              
+            } else if (sel.ben == "Continous.Constant") {
+              
+              #Probability of reporting
+              ST <- function(y, sigma_squared_imputed, alpha_ben) {
+                p = pnorm(-y/sqrt(sigma_squared_imputed))
+                ifelse(p <= alpha_ben, 
+                       1-(p^rho1)/(alpha_ben^rho1),
+                       0
+                )
+              }
+              #Integrand
+              integrand <- function(y, mu, tau_squared, sigma_squared_imputed, alpha_ben) {
+                
+                weight <- 1 - ST(y, sigma_squared_imputed, alpha_ben)
+                (1 / sqrt(2 * pi * (sigma_squared_imputed + tau_squared))) * exp(-0.5 * ((y - mu)^2 / (sigma_squared_imputed + tau_squared))) * weight
+              }
+              
+              #log-lik contribution
+              sum(log(sapply(sigma_squared_imputed, function(sigma_sq_imputed) {
+                integrate(function(y) integrand(y, mu, tau_squared, sigma_sq_imputed, alpha_ben),
+                          lower = -10, upper = 10, subdivisions = 200, stop.on.error=FALSE)$value
+              })))
+            } else if (sel.ben == "Continous.Continous") {
+              #Probability of reporting
+              TT <- function(y, sigma_squared_imputed, alpha_ben) {
+                p = pnorm(-y/sqrt(sigma_squared_imputed))
+                ifelse(p <= alpha_ben, 
+                       1 - (1-0.5)*(p^rho1)/(alpha_ben^rho1),
+                       0.5*(p^(-rho2))/(alpha_ben^(-rho2))
+                )
+              }
+              #Integrand
+              integrand <- function(y, mu, tau_squared, sigma_squared_imputed, alpha_ben) {
+                
+                weight <- 1 - TT(y, sigma_squared_imputed, alpha_ben)
+                (1 / sqrt(2 * pi * (sigma_squared_imputed + tau_squared))) * exp(-0.5 * ((y - mu)^2 / (sigma_squared_imputed + tau_squared))) * weight
+              }
+              #log-lik contribution
+              sum(log(sapply(sigma_squared_imputed, function(sigma_sq_imputed) {
+                integrate(function(y) integrand(y, mu, tau_squared, sigma_sq_imputed, alpha_ben),
+                          lower = -10, upper = 10, subdivisions = 200, stop.on.error=FALSE)$value
+              })))
+            
+            } else if (sel.ben == "DGM") {
+              
+              #Probability of reporting
+              DGM <- function(y, sigma_squared_imputed, gam) {
+                
+                p = pnorm(-y/sqrt(sigma_squared_imputed))
+                exp(-4*p^(gam))
+              }
+              
+              #Integrand
+              integrand <- function(y, mu, tau_squared, sigma_squared_imputed, gam) {
+                
+                weight <- 1 - DGM(y, sigma_squared_imputed, gam)
+                (1 / sqrt(2 * pi * (sigma_squared_imputed + tau_squared))) * exp(-0.5 * ((y - mu)^2 / (sigma_squared_imputed + tau_squared))) * weight
+              }
+              
+              #log-lik contribution
+              sum(log(sapply(sigma_squared_imputed, function(sigma_sq_imputed) {
+                integrate(function(y) integrand(y, mu, tau_squared, sigma_sq_imputed, gam),
+                          lower = -10, upper = 10, subdivisions = 200, stop.on.error=FALSE)$value
+              })))
+              
+            } else {
+              
+              stop("Error: Invalid weight function specified. ")
+            }
+      
+          } else {
+            0  # Return 0 if sigma_squared_imputed is empty
+          }
+      }
+    }
+    #Maximize log-likelihood
+    if (method == "L-BFGS-B"){
+      
+      fit.adj.b <- optim(init_params, f.adj.b, logRR = logRR, sigma_squared = sigma_squared, sigma_squared_imputed = sigma_squared_imputed,
+                         method = method,
+                         lower = lower,
+                         upper = upper,
+                         control = list(fnscale = -1),
+                         
+                         hessian=my.hessian)
+    } else {
+      
+      fit.adj.b <- optim(init_params, f.adj.b, logRR = logRR, sigma_squared = sigma_squared, sigma_squared_imputed = sigma_squared_imputed,
+                         method = method,
+                         control = list(fnscale = -1),
+                         hessian=my.hessian)
+      
+      
+    }
+    
+    #Return adjusted mu and tau_squared
+    mle.b <- fit.adj.b$par[1]
+    mle.b.tau <- max(fit.adj.b$par[2],0)
+    
+    #LIKELIHOOD RATIO CONFIDENCE INTERVALS
+    
+    if (LR.CI){
+      
+      #Unadjusted
+      z <- qchisq(1-alpha_ben, df=1) #3.841
+      #Re-write log likelihood with two inputs instead of param = c(mu, tau_squared)
+      ll.u <- function(mu, tau_squared, logRR, sigma_squared) {
+        -(1/2)*sum(log(sigma_squared + tau_squared) + ((logRR - mu)^2)/(sigma_squared + tau_squared))
+      }
+      #Profile log-likelihood
+      pl.u <- function(mu, logRR, sigma_squared) { #take in vector of mus
+        res <- mu
+        for (i in seq_along(mu)) { #for all these values of mu
+          optimResult <- optim(par = init_param[2],
+                               fn = function(tau_squared) ll.u(mu[i], tau_squared, logRR=logRR, sigma_squared = sigma_squared),
+                               method = "Brent",
+                               lower= 0.0001,
+                               upper=10,
+                               control = list(fnscale = -1))
+          res[i] <- optimResult$value
+        }
+        return(res)
+      }
+      
+      f <- function(mu, logRR, sigma_squared){
+        pl.u(mu, logRR=logRR, sigma_squared=sigma_squared) - pl.u(mle.u, logRR=logRR, sigma_squared=sigma_squared) + 1/2*qchisq(0.95, df=1)
+      }
+      
+      eps <- sqrt(.Machine$double.eps)
+      lowerBound.u <- uniroot(f, interval = c(-5, mle.u), logRR=logRR, sigma_squared=sigma_squared)$root
+      upperBound.u <- uniroot(f, interval = c( mle.u, 5), logRR=logRR, sigma_squared=sigma_squared)$root
+      
+      #Profile log-likelihood for tau squared
+      pl.u.tau <- function(tau_squared, logRR, sigma_squared) { #take in vector of tau_squares
+        
+        res <- tau_squared
+        for (i in seq_along(tau_squared)) { #for all these values of mu
+          optimResult <- optim(par = init_param[1],
+                               fn = function(mu) ll.u(tau_squared[i], mu, logRR=logRR, sigma_squared = sigma_squared),
+                               method = "Brent",
+                               lower= -5,
+                               upper=5,
+                               control = list(fnscale = -1))
+          res[i] <- optimResult$value
+        }
+        return(res)
+      }
+      
+      f.tau <- function(tau_squared, logRR, sigma_squared){
+        pl.u.tau(tau_squared, logRR=logRR, sigma_squared=sigma_squared) - pl.u.tau(mle.tau, logRR=logRR, sigma_squared=sigma_squared) + 1/2*qchisq(0.95, df=1)
+      }
+      eps <- sqrt(.Machine$double.eps)
+      lowerBound.u.tau <- max(uniroot(f.tau, interval = c(-10, mle.tau), logRR=logRR, sigma_squared=sigma_squared)$root,0)
+      upperBound.u.tau <- max(uniroot(f.tau, interval = c( mle.tau, 10), logRR=logRR, sigma_squared=sigma_squared)$root,0)
+      
+      #Adjusted benefit
+      
+      #Re-write log likelihood with two inputs instead of param = c(mu, tau_squared)
+      ll.b <- function(mu, tau_squared, logRR, sigma_squared, sigma_squared_imputed) {
+        
+        if(tau_squared < 0){
+          - Inf
+        } else {
+          
+        #The contribution from the reported studies is always present
+        -(1/2)*sum(log(sigma_squared + tau_squared) + ((logRR - mu)^2)/(sigma_squared + tau_squared)) +
+          
+          if (length(sigma_squared_imputed) > 0) {
+            if (sel.ben == "Constant.Constant"){
+              
+              #sum(log(pnorm((z_alpha*sqrt(sigma_squared_imputed) - mu)/sqrt(sigma_squared_imputed + tau_squared))))
+              
+              #Probability of reporting
+              SS <- function(y, sigma_squared_imputed, alpha_ben) {
+                p = pnorm(-y/sqrt(sigma_squared_imputed))
+                ifelse(p <= alpha_ben, 
+                       1,
+                       0)
+              }
+              
+              #Integrand
+              integrand <- function(y, mu, tau_squared, sigma_squared_imputed, alpha_ben) {
+                weight <- 1 - SS(y, sigma_squared_imputed, alpha_ben)
+                (1 / sqrt(2 * pi * (sigma_squared_imputed + tau_squared))) * exp(-0.5 * ((y - mu)^2 / (sigma_squared_imputed + tau_squared))) * weight
+              }
+              
+              #log-lik contribution
+              sum(log(sapply(sigma_squared_imputed, function(sigma_sq_imputed) {
+                integrate(function(y) integrand(y, mu, tau_squared, sigma_sq_imputed, alpha_ben), #change here April 2. added Vectorize
+                          lower = -10, upper = 10, subdivisions = 200, stop.on.error=FALSE)$value
+              })))
+              
+            } else if (sel.ben == "Constant.Continous") {
+              
+              #Probability of reporting
+              TS <- function(y, sigma_squared_imputed, alpha_ben) {
+                p = pnorm(-y/sqrt(sigma_squared_imputed))
+                ifelse(p <= alpha_ben, 
+                       1,
+                       (p^(-rho2))/(alpha_ben^(-rho2)))
+              }
+              #Integrand
+              integrand <- function(y, mu, tau_squared, sigma_squared_imputed, alpha_ben) {
+                
+                weight <- 1 - TS(y, sigma_squared_imputed, alpha_ben)
+                (1 / sqrt(2 * pi * (sigma_squared_imputed + tau_squared))) * exp(-0.5 * ((y - mu)^2 / (sigma_squared_imputed + tau_squared))) * weight
+              }
+              
+              #log-lik contribution
+              sum(log(sapply(sigma_squared_imputed, function(sigma_sq_imputed) {
+                integrate(function(y) integrand(y, mu, tau_squared, sigma_sq_imputed, alpha_ben), #change here April 2. added Vectorize
+                          lower = -10, upper = 10, subdivisions = 200, stop.on.error=FALSE)$value
+              })))
+              
+            } else if (sel.ben == "Continous.Constant") {
+              
+              #Probability of reporting
+              ST <- function(y, sigma_squared_imputed, alpha_ben) {
+                p = pnorm(-y/sqrt(sigma_squared_imputed))
+                
+                ifelse(p <= alpha_ben, 
+                       1-(p^rho1)/(alpha_ben^rho1),
+                       0
+                )
+              }
+              
+              #Integrand
+              integrand <- function(y, mu, tau_squared, sigma_squared_imputed, alpha_ben) {
+                
+                weight <- 1 - ST(y, sigma_squared_imputed, alpha_ben)
+                (1 / sqrt(2 * pi * (sigma_squared_imputed + tau_squared))) * exp(-0.5 * ((y - mu)^2 / (sigma_squared_imputed + tau_squared))) * weight
+              }
+              
+              #log-lik contribution
+              sum(log(sapply(sigma_squared_imputed, function(sigma_sq_imputed) {
+                integrate(function(y) integrand(y, mu, tau_squared, sigma_sq_imputed, alpha_ben),
+                          lower = -10, upper = 10, subdivisions = 200, stop.on.error=FALSE)$value
+              })))
+              
+            } else if (sel.ben == "Continous.Continous") {
+              
+              #Probability of reporting
+              TT <- function(y, sigma_squared_imputed, alpha_ben) {
+                
+                p = pnorm(-y/sqrt(sigma_squared_imputed))
+                
+                ifelse(p <= alpha_ben, 
+                       1 - (1-0.5)*(p^rho1)/(alpha_ben^rho1),
+                       0.5*(p^(-rho2))/(alpha_ben^(-rho2))
+                )
+              }
+              
+              #Integrand
+              integrand <- function(y, mu, tau_squared, sigma_squared_imputed, alpha_ben) {
+                
+                weight <- 1 - TT(y, sigma_squared_imputed, alpha_ben)
+                (1 / sqrt(2 * pi * (sigma_squared_imputed + tau_squared))) * exp(-0.5 * ((y - mu)^2 / (sigma_squared_imputed + tau_squared))) * weight
+              }
+              
+              #log-lik contribution
+              sum(log(sapply(sigma_squared_imputed, function(sigma_sq_imputed) {
+                integrate(function(y) integrand(y, mu, tau_squared, sigma_sq_imputed, alpha_ben),
+                          lower = -10, upper = 10, subdivisions = 200, stop.on.error=FALSE)$value
+              })))
+              
+            } else if (sel.ben == "DGM") {
+              
+              #Probability of reporting
+              DGM <- function(y, sigma_squared_imputed, gam) {
+                
+                p = pnorm(-y/sqrt(sigma_squared_imputed))
+                
+                exp(-4*p^(gam))
+              }
+              
+              #Integrand
+              integrand <- function(y, mu, tau_squared, sigma_squared_imputed, gam) {
+                
+                weight <- 1 - DGM(y, sigma_squared_imputed, gam)
+                (1 / sqrt(2 * pi * (sigma_squared_imputed + tau_squared))) * exp(-0.5 * ((y - mu)^2 / (sigma_squared_imputed + tau_squared))) * weight
+              }
+              
+              #log-lik contribution
+              sum(log(sapply(sigma_squared_imputed, function(sigma_sq_imputed) {
+                integrate(function(y) integrand(y, mu, tau_squared, sigma_sq_imputed, gam),
+                          lower = -10, upper = 10, subdivisions = 200, stop.on.error=FALSE)$value
+              })))
+            } else {
+              stop("Error: Invalid weight function specified. ")
+            }
+          } else {
+            0  # Return 0 if sigma_squared_imputed is empty
+          }
+        }
+      }
+      #Adjusted profile log likelihood for mu
+      pl.b <- function(mu, logRR, sigma_squared, sigma_squared_imputed) { #take in vector of mus
+        res <- mu
+        for (i in seq_along(mu)) { #for all these values of mu
+          optimResult <- optim(par = init_param[2],
+                               fn = function(tau_squared) ll.b(mu[i], tau_squared,
+                                                               logRR=logRR,
+                                                               sigma_squared = sigma_squared,
+                                                               sigma_squared_imputed = sigma_squared_imputed),
+                               method = "Brent", lower=0.00001, upper=10,
+                               control = list(fnscale = -1))
+          res[i] <- optimResult$value
+        }
+        return(res)
+      }
+      f.b <- function(mu, logRR, sigma_squared, sigma_squared_imputed){
+        
+        pl.b(mu, logRR=logRR, sigma_squared=sigma_squared, sigma_squared_imputed = sigma_squared_imputed) - pl.b(mle.b, logRR=logRR, sigma_squared=sigma_squared, sigma_squared_imputed = sigma_squared_imputed) + 1/2*qchisq(0.95, df=1)
+      }
+      lowerBound.b <- uniroot(f.b, interval = c(-10, mle.b), logRR=logRR,
+                              sigma_squared=sigma_squared,
+                              sigma_squared_imputed=sigma_squared_imputed)$root
+      upperBound.b <- uniroot(f.b, interval = c(mle.b, 10), logRR=logRR,
+                              sigma_squared=sigma_squared,
+                              sigma_squared_imputed = sigma_squared_imputed)$root
+      
+      #Adjusted profile log likelihood for tau squared
+      pl.b.tau <- function(tau_squared, logRR, sigma_squared, sigma_squared_imputed) { #take in vector of tau_squares
+          res <- tau_squared
+        for (i in seq_along(tau_squared)) { #for all these values of tau_squared
+          optimResult <- optim(par = init_param[1],
+                               fn = function(mu) ll.b(tau_squared[i], mu,
+                                                      logRR=logRR,
+                                                      sigma_squared = sigma_squared,
+                                                      sigma_squared_imputed = sigma_squared_imputed), method = "Brent", lower=-5, upper=5,
+           control = list(fnscale = -1))
+          res[i] <- optimResult$value
+        }
+        return(res)
+      }
+      f.b.tau <- function(tau_squared, logRR, sigma_squared, sigma_squared_imputed){
+        pl.b.tau(tau_squared, logRR=logRR, sigma_squared=sigma_squared, sigma_squared_imputed = sigma_squared_imputed) - pl.b.tau(mle.b.tau, logRR=logRR, sigma_squared=sigma_squared, sigma_squared_imputed = sigma_squared_imputed) + 1/2*qchisq(0.95, df=1)
+      }
+      lowerBound.b.tau <- 0
+      
+      tryCatch({
+        
+      lowerBound.b.tau <- 
+        uniroot(f.b.tau, interval = c(-5, fit.adj.b$par[2]), logRR=logRR,
+                              sigma_squared=sigma_squared, extendInt = "yes")$root
+      }, error = function(e) {
+        
+        lowerBound.b.tau <- 0})
+             
+      upperBound.b.tau <- 0
+      
+      tryCatch({                        
+      
+      upperBound.b.tau <- 
+        uniroot(f.b.tau, interval = c(fit.adj.b$par[2], 5), logRR=logRR,
+                              sigma_squared=sigma_squared, sigma_squared_imputed=sigma_squared_imputed, extendInt="yes")$root
+      }, error = function(e) {
+        
+        upperBound.b.tau <- 0})
+      
+      if (Wald.CI){
+        #WALD CONFIDENCE INTERVALS
+        a <- alpha_ben #for harm Copas et al use 99% conf level
+        #Unadjusted
+        fisher_info.u <- solve(-fit.u$hessian)
+        s.u <- sqrt(diag(fisher_info.u)[1])
+        ci.u <- fit.u$par[1] + qnorm(c(a/2, 1-a/2)) * s.u
+        #Adjusted benefit
+        fisher_info.adj.b <- solve(-fit.adj.b$hessian)
+        s.adj.b <- sqrt(diag(fisher_info.adj.b)[1])
+        ci.u.adj.b <- fit.adj.b$par[1] + qnorm(c(a/2, 1-a/2)) * s.adj.b
+
+        return(list(mu_unadjusted = mle.u,
+                    LR_mu_unadjusted_low = lowerBound.u,
+                    LR_mu_unadjusted_up = upperBound.u,
+
+                    CI_unadjusted_low_WALD = ci.u[1],
+                    CI_unadjusted_up_WALD = ci.u[2],
+                    
+                    mu_adjusted_benefit = mle.b,
+                    LR_mu_adjusted_low = lowerBound.b,
+                    LR_mu_adjusted_up = upperBound.b,
+                    
+                    CI_adjusted_benefit_low_WALD = ci.u.adj.b[1],
+                    CI_adjusted_benefit_up_WALD = ci.u.adj.b[2]
+        ))
+        
+      } else {
+        return(list(mu_unadjusted = mle.u,
+                    LR_mu_unadjusted_low = lowerBound.u,
+                    LR_mu_unadjusted_up = upperBound.u,
+                    
+                    mu_adjusted_benefit = mle.b,
+                    LR_mu_adjusted_low = lowerBound.b,
+                    LR_mu_adjusted_up = upperBound.b
+        ))
+      }
+    } else {
+      return(list(
+        mu_unadjusted = mle.u,
+        mu_adjusted_benefit = mle.b
+      ))
+    }
+  } else {
+    return("invalid outcome input")
+  }
+}
+```
+
+```{r, warning=FALSE}
+resultLL_SeizureFree <- reORBadj(a = data_topiramate_unrep$T2,
+                                 c = data_topiramate_unrep$C2,
+                                 n1 = data_topiramate_unrep$N_t,
+                                 n2 = data_topiramate_unrep$N_c,
+                                 outcome = "benefit",
+                                 init_param = c(0.7, 0.37),
+                                 alpha_ben = 0.05,
+                                 alpha_ben_one.sided = TRUE, 
+                                 true.SE = NULL,
+                                 LR.CI = TRUE,
+                                 rho1 = 3,
+                                 rho2 = 3,
+                                 selection.benefit = "Constant.Constant",
+                                 opt_method = "L-BFGS-B")
+
+resultLC_SeizureFree <- reORBadj(a = data_topiramate_unrep$T2,
+                                 c = data_topiramate_unrep$C2,
+                                 n1 = data_topiramate_unrep$N_t,
+                                 n2 = data_topiramate_unrep$N_c,
+                                 outcome = "benefit",
+                                 init_param = c(0.7, 0.37),
+                                 alpha_ben = 0.05,
+                                 alpha_ben_one.sided = TRUE, 
+                                 true.SE = NULL,
+                                 LR.CI = TRUE,
+                                 rho1 = 3,
+                                 rho2 = 3,
+                                 selection.benefit = "Constant.Continous",
+                                 opt_method = "L-BFGS-B")
+
+
+resultCL_SeizureFree <- reORBadj(a = data_topiramate_unrep$T2,
+                                 c = data_topiramate_unrep$C2,
+                                 n1 = data_topiramate_unrep$N_t,
+                                 n2 = data_topiramate_unrep$N_c,
+                                 outcome = "benefit",
+                                 init_param = c(0.7, 0.37),
+                                 alpha_ben = 0.05,
+                                 alpha_ben_one.sided = TRUE, 
+                                 true.SE = NULL,
+                                 LR.CI = TRUE,
+                                 rho1 = 3,
+                                 rho2 = 3,
+                                 selection.benefit = "Continous.Constant",
+                                 opt_method = "L-BFGS-B")
+
+      
+resultCC1_SeizureFree <- reORBadj(a = data_topiramate_unrep$T2,
+                                  c = data_topiramate_unrep$C2,
+                                  n1 = data_topiramate_unrep$N_t,
+                                  n2 = data_topiramate_unrep$N_c,
+                                  outcome = "benefit",
+                                  init_param = c(0.7, 0.37),
+                                  alpha_ben = 0.05,
+                                  alpha_ben_one.sided = TRUE, 
+                                  true.SE = NULL,
+                                  LR.CI = TRUE,
+                                  rho1 = 7,
+                                  rho2 = 1.5,
+                                  selection.benefit = "Continous.Continous",
+                                  opt_method = "L-BFGS-B")
+          
+resultCC2_SeizureFree <- reORBadj(a = data_topiramate_unrep$T2,
+                                  c = data_topiramate_unrep$C2,
+                                  n1 = data_topiramate_unrep$N_t,
+                                  n2 = data_topiramate_unrep$N_c,
+                                  outcome = "benefit",
+                                  init_param = c(0.7, 0.37),
+                                  alpha_ben = 0.05,
+                                  alpha_ben_one.sided = TRUE, 
+                                  true.SE = NULL,
+                                  LR.CI = TRUE,
+                                  rho1 = 1.5,
+                                  rho2 = 7,
+                                  selection.benefit = "Continous.Continous",
+                                  opt_method = "L-BFGS-B")
+```
+
+```{r}
+source("Code/00.Functions.R")
+o <- 2
+deltas <- c(0, 0.5, 1.3)
+measures <- c("RR")
+m_imputations <- 1000
+
+#Loop 0: iterate over the two outcomes
+res_uni_plot <- list()   # reset per outcome, otherwise the O2 file also contains the O1 rows
+  # Loop 1: Iterate over measures first and impute once per measure
+  for (m in measures) {
+    
+    theta_cols <- paste0("log_", m, o)
+    se_cols <- paste0("se_", m, o)
+    
+    #cat(sprintf("Generating imputed data for Measure = %s\n", m))
+    
+    # Run imputation ONCE here. The random pool is now locked in.
+    mi <- run_univariate_imputation(
+      data = data_topiramate,
+      theta_col = theta_cols,
+      se_col = se_cols,
+      m = m_imputations
+    )
+    
+    # Extract the static Naive estimate for this measure
+    naive_df <- data.frame(
+      Approach = "Naive estimate",
+      Estimate = as.numeric(mi$res_naive$beta),
+      SE       = mi$res_naive$se,
+      CI_Lower = mi$res_naive$ci.lb,
+      CI_Upper = mi$res_naive$ci.ub
+    )
+    
+    # refit the imputed datasets once, reused for every delta and selection type
+    fits_uni <- fit_imputations_uni(mi)
+   # failed_refits[paste0("Plot uni ", m, " O", o)] <- attr(fits_uni, "failed.proportion")
+    
+    # Loop 2: Now test different deltas using the same imputed data
+    for (delta in deltas) {
+      
+      #cat(sprintf("  -> Calculating adjustments for delta = %s\n", delta))
+      
+      # Importance sampling calculations over the static 'mi' object
+      adj_eff <- adj_univariate(mi,
+                                delta = delta,
+                                select_type = "effect",
+                                track.ess = FALSE,
+                                fits = fits_uni)
+      
+      adj_z   <- adj_univariate(mi,
+                                delta = delta,
+                                select_type = "zscore",
+                                track.ess = FALSE,
+                                fits = fits_uni)
+      
+      # Stack the results
+      tmp <- rbind(naive_df, adj_eff, adj_z)
+      
+      # Add metadata
+      tmp$Measure   <- paste0("log ", m)
+      tmp$Selection <- delta  # Saved as numeric directly to avoid your earlier character bug!
+      
+      # Append to list
+      res_uni_plot[[length(res_uni_plot) + 1]] <- tmp
+    }
+  }
+  
+ plot_uni_df <- do.call(rbind,
+                        res_uni_plot)
+  
+  # bring data into wide format
+ naive_df <- plot_uni_df %>%
+    filter(Approach == "Naive estimate") %>%
+    dplyr::select(Selection,
+                  Estimate_unadjusted = Estimate,
+                  CI_unadjusted_lower = CI_Lower,
+                  CI_unadjusted_upper = CI_Upper)
+  
+  adjusted_df <- plot_uni_df %>%
+    filter(Approach != "Naive estimate") %>%
+    # Create the Z_score column your plot expects (TRUE if zscore, FALSE if effect)
+    mutate(Z_score = ifelse(Approach == "Selection on zscore", TRUE, FALSE)) %>%
+    dplyr::select(Selection, Z_score,
+                  estimate_logRR = Estimate,
+                  ci_lower_logRR = CI_Lower,
+                  ci_upper_logRR = CI_Upper)
+  
+final_uni_df <- adjusted_df %>%
+    left_join(naive_df, by = c("Selection"))
+  
+df_naive_uni <- naive_df %>%
+  slice(1) %>%
+  transmute(
+    Model      = "Naive Univariate Estimate",
+    logRR      = Estimate_unadjusted,
+    CI_low_log = CI_unadjusted_lower,
+    CI_up_log  = CI_unadjusted_upper,
+    RR         = exp(logRR),
+    CI_low_RR  = exp(CI_low_log),
+    CI_up_RR   = exp(CI_up_log)
+  )
+```
+
+```{r}
+res_biv_df <- list()
+rhos <- c("pearson")
+deltas <- c(0, 0.5, 1.3) 
+m_imputations <- 1000
+
+set.seed(1)
+
+# loop over the rhos 
+for (rho in rhos) {
+  
+  #loop over the two measures (here we dont loop for the outcomes since they are processed together)
+  for (m in measures) {
+    
+   # cat(sprintf("\n--- Running Bivariate Imputation Pool: Measure = %s, correlation setting = %s ---\n", m, rho))
+    
+    theta_cols <- paste0("log_", m, c(1, 2))
+    se_cols <- paste0("se_", m, c(1, 2))
+    
+    # Run imputation
+    mi_biv <- run_bivariate_imputation(
+      data = data_topiramate, 
+      theta_cols = theta_cols, 
+      se_cols = se_cols, 
+      rho_w = rho, 
+      m = m_imputations
+    )
+    
+    # create naive df similar to the one produced by adj_bivariate
+    naive_df <- data.frame(
+      Outcome   = c("O1", "O2"),
+      Approach  = "Naive estimate",
+      Estimate  = as.numeric(mi_biv$res_naive$beta),
+      SE        = sqrt(diag(mi_biv$res_naive$vb)),
+      CI_Lower  = mi_biv$res_naive$ci.lb,
+      CI_Upper  = mi_biv$res_naive$ci.ub
+    )
+    
+    # refit the imputed datasets once, reused for every delta and selection type
+    fits_biv <- fit_imputations_biv(mi_biv)
+    #failed_refits[paste0("Plot biv ", m, " rho_w=", rho)] <- mean(sapply(fits_biv, is.null))
+    
+    for(delta in deltas) {
+      
+     # cat(sprintf("  -> Calculating Bivariate Adjustments for delta = %s\n", delta))
+      
+      # Calculate both Adjustments (each return a 2-row dataframe for O1 and O2)
+      adj_eff <- adj_bivariate(mi_biv, 
+                               delta = delta, 
+                               select_type = "effect",
+                               track.ess = FALSE, 
+                               track.failed.proportion = FALSE,
+                               fits = fits_biv)
+      
+      adj_z   <- adj_bivariate(mi_biv, 
+                               delta = delta, 
+                               select_type = "zscore", 
+                               track.ess = FALSE, 
+                               track.failed.proportion = FALSE,
+                               fits = fits_biv)
+      
+      # stack them
+      tmp <- rbind(naive_df,
+                   adj_eff,
+                   adj_z)
+      
+      #add explaining columns
+      tmp$Correlation <- paste0(rho)
+      tmp$Measure     <- paste0("log ", m)
+      tmp$Selection   <- delta
+      
+      res_biv_df[[length(res_biv_df) + 1]] <- tmp
+    }
+  }
+}
+
+plot_biv_df <- do.call(rbind,
+                       res_biv_df)
+# Reshape wide
+naive_part <- plot_biv_df %>%
+    filter(Approach == "Naive estimate") %>%
+    dplyr::select(Outcome, Measure, Selection, Correlation,
+           Estimate_unadjusted = Estimate,
+           CI_unadjusted_lower = CI_Lower,
+           CI_unadjusted_upper = CI_Upper)
+  
+plot_biv_df <- plot_biv_df %>%
+    filter(Approach != "Naive estimate") %>%
+    mutate(
+      Z_score = (Approach == "Bivariate Selection on zscore")
+    ) %>%
+    dplyr::select(Outcome, Measure, Selection, Z_score, Correlation,
+           Estimate_adjusted = Estimate, 
+           SE_adjusted       = SE,
+           CI_adjusted_lower = CI_Lower, 
+           CI_adjusted_upper = CI_Upper) %>%
+    left_join(naive_part, by = c("Selection", "Measure", "Correlation", "Outcome"))
+ 
+ plot_biv_df_O2 <- subset(plot_biv_df, Outcome == "O2")
+ 
+# Format Naive Bivariate row
+df_naive_biv <- naive_part %>%
+  filter(Outcome == "O2") %>%
+  slice(1) %>%
+  transmute(
+    Model      = "Naive Bivariate Estimate",
+    logRR      = Estimate_unadjusted,
+    CI_low_log = CI_unadjusted_lower,
+    CI_up_log  = CI_unadjusted_upper,
+    RR         = exp(logRR),
+    CI_low_RR  = exp(CI_low_log),
+    CI_up_RR   = exp(CI_up_log)
+  )
+```
+
+```{r}
+# Kirkham et al. (2012)
+# Bivariate multivariate meta-analysis for outcome reporting bias
+fit_kirkham_bivariate <- function(data,
+                                  rho_w = rho_w,
+                                  method = "REML") {
+  # Create long-format data
+  df_long <- bind_rows(
+    data %>%
+      transmute(Study_id = Study_id,
+                outcome  = "O1",
+                yi       = log_RR1,
+                sei      = se_RR1),
+    data %>%
+      transmute(Study_id = Study_id,
+                outcome  = "O2",
+                yi       = log_RR2,
+                sei      = se_RR2)
+  ) %>%
+    mutate(outcome = factor(outcome, levels = c("O1", "O2"))) %>%
+    arrange(Study_id, outcome)
+  # Identify observed outcomes
+  df_obs <- df_long %>%
+    filter(!is.na(yi), !is.na(sei))
+
+  # Check that both outcomes are available
+  if (!all(c("O1", "O2") %in% unique(df_obs$outcome))) {
+    stop("Both outcomes must have at least one reported study.")
+  }
+  # Construct within-study covariance matrix
+  # Only reported outcomes are included.
+  # For studies reporting both outcomes:
+  # Cov(Y_i1, Y_i2) = rho_w * SE_i1 * SE_i2
+  studies <- unique(df_obs$Study_id)
+  V_blocks <- vector("list", length(studies))
+  names(V_blocks) <- studies
+  for (s in studies) {
+    d <- df_obs[df_obs$Study_id == s, ]
+    # Order O1, O2
+    d <- d[order(d$outcome), ]
+    if (nrow(d) == 2) {
+      se1 <- d$sei[d$outcome == "O1"]
+      se2 <- d$sei[d$outcome == "O2"]
+      V_blocks[[as.character(s)]] <-
+        matrix(
+          c(se1^2,
+            rho_w * se1 * se2,
+            rho_w * se1 * se2,
+            se2^2), 
+          nrow = 2, byrow = TRUE
+        )
+    } else {
+      # Only one outcome reported
+      V_blocks[[as.character(s)]] <-  matrix(d$sei^2, nrow = 1, ncol = 1)
+    }
+  }
+  # Combine blocks into full V matrix
+  V <- as.matrix(Matrix::bdiag(V_blocks))
+  # Ensure the order of rows in df_obs corresponds to V
+  df_obs <- df_obs %>%
+    arrange(Study_id, outcome)
+  # Fit bivariate random-effects meta-analysis
+  # This is the Kirkham multivariate approach:information from O1 contributes to 
+  # estimation of O2 through the within-study and between-study correlations.
+  fit <- metafor::rma.mv(yi = yi,
+                         V = V,
+                         mods = ~ outcome - 1,
+                         random = ~ outcome | Study_id,
+                         struct = "UN",
+                         data = df_obs,
+                         method = method,
+                         control = list(rel.tol = 1e-8, maxiter = 1000))
+  # 7. Extract pooled estimates
+  beta <- as.numeric(coef(fit))
+  se   <- fit$se
+  ci_lb <- fit$ci.lb
+  ci_ub <- fit$ci.ub
+  result <- data.frame(Approach = "Kirkham et al. (2012)",
+                       Outcome = c("O1", "O2"),
+                       Estimate = beta,
+                       SE = se,
+                       CI_Lower = ci_lb,
+                       CI_Upper = ci_ub) %>%
+    mutate(RR = exp(Estimate),
+           CI_Lower_RR = exp(CI_Lower),
+           CI_Upper_RR = exp(CI_Upper))
+  return(
+    list(fit = fit)
+  )
+}
+
+complete <- data_topiramate %>%
+  filter(!is.na(log_RR1),
+         !is.na(log_RR2))
+
+rho_w <- cor(
+  complete$log_RR1,
+  complete$log_RR2,
+  method = "pearson"
+)
+  
+kirkham_res <- fit_kirkham_bivariate(
+  data = data_topiramate,
+  rho_w = rho_w
+)
+
+# Extract Outcome 2 (Seizure Freedom, which corresponds to outcomeO2)
+kirkham_fit <- kirkham_res$fit
+
+# Identify index for Outcome 2 in rma.mv coefficients
+idx_o2 <- which(names(coef(kirkham_fit)) == "outcomeO2")
+
+# Format Kirkham result as a 1-row data frame matching your other models
+df_kirkham <- data.frame(
+  Model      = "Kirkham et al. (2012)",
+  logRR      = as.numeric(coef(kirkham_fit)[idx_o2]),
+  CI_low_log = as.numeric(kirkham_fit$ci.lb[idx_o2]),
+  CI_up_log  = as.numeric(kirkham_fit$ci.ub[idx_o2]),
+  RR         = exp(as.numeric(coef(kirkham_fit)[idx_o2])),
+  CI_low_RR  = exp(as.numeric(kirkham_fit$ci.lb[idx_o2])),
+  CI_up_RR   = exp(as.numeric(kirkham_fit$ci.ub[idx_o2]))
+)
+```
+
+
+```{r}
+#  Format the Logistic ORB results
+df_logistic_biv <- plot_biv_df_O2 %>%
+  mutate(
+    stat_label = ifelse(Z_score == TRUE, "z", "\u03b8\u0302"),
+    Model = paste0("Biv-MI-ORB (\u03b4 = ", Selection, ", s = ", stat_label, ")"),
+    logRR = Estimate_adjusted,
+    CI_low_log = CI_adjusted_lower,
+    CI_up_log  = CI_adjusted_upper,
+    RR         = exp(logRR),
+    CI_low_RR  = exp(CI_low_log),
+    CI_up_RR   = exp(CI_up_log)
+  ) %>%
+  dplyr::select(Model, logRR, CI_low_log, CI_up_log, RR, CI_low_RR, CI_up_RR)
+
+#  Format the Logistic ORB results
+df_logistic_formatted <- final_uni_df %>%
+  mutate(
+    stat_label = ifelse(Z_score == TRUE, "z", "\u03b8\u0302"),
+    Model = paste0("Uni-MI-ORB (\u03b4 = ", Selection, ", s = ", stat_label, ")"),
+    logRR = estimate_logRR,
+    CI_low_log = ci_lower_logRR,
+    CI_up_log  = ci_upper_logRR,
+    RR         = exp(logRR),
+    CI_low_RR  = exp(CI_low_log),
+    CI_up_RR   = exp(CI_up_log)
+  ) %>%
+  dplyr::select(Model, logRR, CI_low_log, CI_up_log, RR, CI_low_RR, CI_up_RR)
+
+#  Results list for the existing models
+results_list <- list("Copas (ORBIT Adjusted) (FE)"        = copas_result,
+                     "Saracini: Piecewise constant"       = resultLL_SeizureFree,
+                     "Saracini: Constant-Decreasing"      = resultLC_SeizureFree,
+                     "Saracini: Decreasing-Constant"      = resultCL_SeizureFree,
+                     "Saracini: Piecewise Decreasing (1)" = resultCC2_SeizureFree,
+                     "Saracini: Piecewise Decreasing (2)" = resultCC1_SeizureFree)
+
+# Extraction helper
+extract_model_estimates <- function(res, name) {
+  if (name == "Copas (ORBIT Adjusted) (FE)") {
+    mu  <- res$estimate_logRR
+    low <- res$ci_lower_logRR
+    up  <- res$ci_upper_logRR
+  } else {
+    mu  <- res$mu_adjusted_benefit
+    low <- res$LR_mu_adjusted_low
+    up  <- res$LR_mu_adjusted_up
+  }
+  
+  data.frame(Model      = name,
+             logRR      = mu,
+             CI_low_log = low,
+             CI_up_log  = up,
+             RR         = exp(mu),
+             CI_low_RR  = exp(low),
+             CI_up_RR   = exp(up))
+}
+
+df_other <- imap_dfr(results_list,
+                     extract_model_estimates)
+
+#  Stack all models together
+df_all_models <- bind_rows(df_naive_uni,
+                           df_other, 
+                           df_logistic_formatted,
+                           df_naive_biv,
+                           df_kirkham,
+                           df_logistic_biv)
+
+# Add a category variable for grouped coloring
+df_all_models <- df_all_models |>
+  mutate(
+    Category = case_when(
+      grepl("Naive", Model) ~ "Naive",
+      grepl("Copas", Model)      ~ "Copas",
+      grepl("Saracini", Model)   ~ "Saracini & Held",
+      grepl("Uni-MI-ORB", Model)   ~ "Uni-MI-ORB",
+      grepl("Biv-MI-ORB", Model)   ~ "Biv-MI-ORB",
+      grepl("Kirkham", Model)      ~ "Kirkham",
+      TRUE                       ~ "Other"
+    ),
+    Model = factor(Model, levels = rev(unique(Model)))
+  )
+```
+
+```{r}
+# Create label column "RR [CI_low, CI_up]"
+df_plot <- df_all_models |>
+  mutate(
+    # Format text: e.g. "3.22 [1.27, 8.65]"
+    label_text = sprintf("%.2f [%.2f, %.2f]", RR, CI_low_RR, CI_up_RR),
+    # Preserve vertical ordering
+    Model = factor(Model, levels = rev(unique(Model)))
+  )
+
+# Determine maximum upper CI limit to dynamically position labels
+x_min <- min(df_plot$CI_low_log, na.rm = TRUE)
+x_max <- max(df_plot$CI_up_log, na.rm = TRUE)
+
+x_range <- x_max - x_min
+
+ggplot(df_plot, aes(x = logRR, y = Model, color = Category)) +
+  # Reference line at No Effect (RR = 1)
+  geom_vline(xintercept = 0, linetype = "dashed", color = "gray60") +
+  # Error bars and point estimates
+  geom_errorbarh(aes(xmin = CI_low_log, xmax = CI_up_log), width = 0.25, linewidth = 0.8) +
+  geom_point(shape = 18, size = 3.5) +
+  # Logarithmic scale with margin space for the text column
+  scale_x_continuous(limits = c(x_min - 0.05 * x_range,x_max + 0.05 * x_range)) +
+  # Allow text to sit outside default clipping area if needed
+  coord_cartesian(clip = "off") +
+  labs(x = "Log RR", y = NULL, color = " ") +
+  theme_minimal(base_size = 12) +
+  theme(
+    panel.grid.minor = element_blank(),
+    legend.position  = "none",
+    plot.title       = element_text(face = "bold", hjust = 0),
+    axis.text.y      = element_text(face = "bold", color = "black"))
+
+ggsave("Plots_Paper/Forestplot_Comparison_O2.png", width = 10, height = 6)
+```
+
+### for seizure reduction
+
+```{r}
+# copas Orbit approach
+copas_result_O1 <- copas_orb_adjustment(data_topiramate,
+                                        theta_col = "log_RR1", 
+                                        se_col    = "se_RR1", 
+                                        risk_col  = "orbit_out1", )
+
+```
+
+```{r, warning=FALSE}
+resultLL_SeizureRed <- reORBadj(a = data_topiramate_unrep$T1,
+                                c = data_topiramate_unrep$C1,
+                                n1 = data_topiramate_unrep$N_t,
+                                n2 = data_topiramate_unrep$N_c,
+                                outcome = "benefit",
+                                init_param = c(0.7, 0.37),
+                                alpha_ben = 0.05,
+                                alpha_ben_one.sided = TRUE, 
+                                true.SE = NULL,
+                                LR.CI = TRUE,
+                                rho1 = 3,
+                                rho2 = 3,
+                                selection.benefit = "Constant.Constant",
+                                opt_method = "L-BFGS-B")
+
+resultLC_SeizureRed <- reORBadj(a = data_topiramate_unrep$T1,
+                                c = data_topiramate_unrep$C1,
+                                n1 = data_topiramate_unrep$N_t,
+                                n2 = data_topiramate_unrep$N_c,
+                                outcome = "benefit",
+                                init_param = c(0.7, 0.37),
+                                alpha_ben = 0.05,
+                                alpha_ben_one.sided = TRUE, 
+                                true.SE = NULL,
+                                LR.CI = TRUE,
+                                rho1 = 3,
+                                rho2 = 3,
+                                selection.benefit = "Constant.Continous",
+                                opt_method = "L-BFGS-B")
+
+
+resultCL_SeizureRed <- reORBadj(a = data_topiramate_unrep$T1,
+                                c = data_topiramate_unrep$C1,
+                                n1 = data_topiramate_unrep$N_t,
+                                n2 = data_topiramate_unrep$N_c,
+                                outcome = "benefit",
+                                init_param = c(0.7, 0.37),
+                                alpha_ben = 0.05,
+                                alpha_ben_one.sided = TRUE, 
+                                true.SE = NULL,
+                                LR.CI = TRUE,
+                                rho1 = 3,
+                                rho2 = 3,
+                                selection.benefit = "Continous.Constant",
+                                opt_method = "L-BFGS-B")
+
+      
+resultCC1_SeizureRed <- reORBadj(a = data_topiramate_unrep$T1,
+                                 c = data_topiramate_unrep$C1,
+                                 n1 = data_topiramate_unrep$N_t,
+                                 n2 = data_topiramate_unrep$N_c,
+                                 outcome = "benefit",
+                                 init_param = c(0.7, 0.37),
+                                 alpha_ben = 0.05,
+                                 alpha_ben_one.sided = TRUE, 
+                                 true.SE = NULL,
+                                 LR.CI = TRUE,
+                                 rho1 = 7,
+                                 rho2 = 1.5,
+                                 selection.benefit = "Continous.Continous",
+                                 opt_method = "L-BFGS-B")
+          
+resultCC2_SeizureRed <- reORBadj(a = data_topiramate_unrep$T1,
+                                 c = data_topiramate_unrep$C1,
+                                 n1 = data_topiramate_unrep$N_t,
+                                 n2 = data_topiramate_unrep$N_c,
+                                 outcome = "benefit",
+                                 init_param = c(0.7, 0.37),
+                                 alpha_ben = 0.05,
+                                 alpha_ben_one.sided = TRUE, 
+                                 true.SE = NULL,
+                                 LR.CI = TRUE,
+                                 rho1 = 1.5,
+                                 rho2 = 7,
+                                 selection.benefit = "Continous.Continous",
+                                 opt_method = "L-BFGS-B")
+```
+
+```{r}
+# Identify index for Outcome 2 in rma.mv coefficients
+idx_o1 <- which(names(coef(kirkham_fit)) == "outcomeO1")
+
+# Format Kirkham result as a 1-row data frame matching your other models
+df_kirkham_O1 <- data.frame(
+  Model      = "Kirkham et al. (2012)",
+  logRR      = as.numeric(coef(kirkham_fit)[idx_o1]),
+  CI_low_log = as.numeric(kirkham_fit$ci.lb[idx_o1]),
+  CI_up_log  = as.numeric(kirkham_fit$ci.ub[idx_o1]),
+  RR         = exp(as.numeric(coef(kirkham_fit)[idx_o1])),
+  CI_low_RR  = exp(as.numeric(kirkham_fit$ci.lb[idx_o1])),
+  CI_up_RR   = exp(as.numeric(kirkham_fit$ci.ub[idx_o1]))
+)
+```
+
+```{r}
+o <- 1
+res_uni_plot <- list()   # reset per outcome, otherwise the O2 file also contains the O1 rows
+  # Loop 1: Iterate over measures first and impute once per measure
+  for (m in measures) {
+    
+    theta_cols <- paste0("log_", m, o)
+    se_cols <- paste0("se_", m, o)
+    
+   # cat(sprintf("Generating imputed data for Measure = %s\n", m))
+    
+    # Run imputation ONCE here. The random pool is now locked in.
+    mi <- run_univariate_imputation(
+      data = data_topiramate,
+      theta_col = theta_cols,
+      se_col = se_cols,
+      m = m_imputations
+    )
+    
+    # Extract the static Naive estimate for this measure
+    naive_df <- data.frame(
+      Approach = "Naive estimate",
+      Estimate = as.numeric(mi$res_naive$beta),
+      SE       = mi$res_naive$se,
+      CI_Lower = mi$res_naive$ci.lb,
+      CI_Upper = mi$res_naive$ci.ub
+    )
+    
+    # refit the imputed datasets once, reused for every delta and selection type
+    fits_uni <- fit_imputations_uni(mi)
+    #failed_refits[paste0("Plot uni ", m, " O", o)] <- attr(fits_uni, "failed.proportion")
+    
+    # Loop 2: Now test different deltas using the same imputed data
+    for (delta in deltas) {
+      
+      #cat(sprintf("  -> Calculating adjustments for delta = %s\n", delta))
+      
+      # Importance sampling calculations over the static 'mi' object
+      adj_eff <- adj_univariate(mi,
+                                delta = delta,
+                                select_type = "effect",
+                                track.ess = FALSE,
+                                fits = fits_uni)
+      
+      adj_z   <- adj_univariate(mi,
+                                delta = delta,
+                                select_type = "zscore",
+                                track.ess = FALSE,
+                                fits = fits_uni)
+      
+      # Stack the results
+      tmp <- rbind(naive_df, adj_eff, adj_z)
+      
+      # Add metadata
+      tmp$Measure   <- paste0("log ", m)
+      tmp$Selection <- delta  # Saved as numeric directly to avoid your earlier character bug!
+      
+      # Append to list
+      res_uni_plot[[length(res_uni_plot) + 1]] <- tmp
+    }
+  }
+plot_uni_df_O1 <- do.call(rbind,
+                          res_uni_plot)
+  
+# bring data into wide format
+naive_df_O1 <- plot_uni_df_O1 %>%
+    filter(Approach == "Naive estimate") %>%
+    dplyr::select(Selection,
+                  Estimate_unadjusted = Estimate,
+                  CI_unadjusted_lower = CI_Lower,
+                  CI_unadjusted_upper = CI_Upper)
+  
+adjusted_df_O1 <- plot_uni_df_O1 %>%
+    filter(Approach != "Naive estimate") %>%
+    # Create the Z_score column your plot expects (TRUE if zscore, FALSE if effect)
+    mutate(Z_score = ifelse(Approach == "Selection on zscore", TRUE, FALSE)) %>%
+    dplyr::select(Selection, Z_score,
+                  estimate_logRR = Estimate,
+                  ci_lower_logRR = CI_Lower,
+                  ci_upper_logRR = CI_Upper)
+  
+final_uni_df_O1 <- adjusted_df_O1 %>%
+    left_join(naive_df_O1, by = c("Selection"))
+  
+df_naive_uni_O1 <- naive_df_O1 %>%
+  slice(1) %>%
+  transmute(
+    Model      = "Naive Univariate Estimate",
+    logRR      = Estimate_unadjusted,
+    CI_low_log = CI_unadjusted_lower,
+    CI_up_log  = CI_unadjusted_upper,
+    RR         = exp(logRR),
+    CI_low_RR  = exp(CI_low_log),
+    CI_up_RR   = exp(CI_up_log)
+  )
+```
+
+
+
+```{r}
+
+plot_biv_df_O1 <- subset(plot_biv_df, Outcome == "O1")
+ 
+# Format Naive Bivariate row
+df_naive_biv_O1 <- naive_part %>%
+  filter(Outcome == "O1") %>%
+  slice(1) %>%
+  transmute(
+    Model      = "Naive Bivariate Estimate",
+    logRR      = Estimate_unadjusted,
+    CI_low_log = CI_unadjusted_lower,
+    CI_up_log  = CI_unadjusted_upper,
+    RR         = exp(logRR),
+    CI_low_RR  = exp(CI_low_log),
+    CI_up_RR   = exp(CI_up_log)
+  )
+```
+
+
+```{r}
+#  Format the Logistic ORB results
+df_logistic_biv_O1 <- plot_biv_df_O1 %>%
+  mutate(
+    stat_label = ifelse(Z_score == TRUE, "z", "\u03b8\u0302"),
+    Model = paste0("Biv-MI-ORB (\u03b4 = ", Selection, ", s = ", stat_label, ")"),
+    logRR = Estimate_adjusted,
+    CI_low_log = CI_adjusted_lower,
+    CI_up_log  = CI_adjusted_upper,
+    RR         = exp(logRR),
+    CI_low_RR  = exp(CI_low_log),
+    CI_up_RR   = exp(CI_up_log)
+  ) %>%
+  dplyr::select(Model, logRR, CI_low_log, CI_up_log, RR, CI_low_RR, CI_up_RR)
+
+#  Format the Logistic ORB results
+df_logistic_formatted <- final_uni_df_O1 %>%
+  mutate(
+    stat_label = ifelse(Z_score == TRUE, "z", "\u03b8\u0302"),
+    Model = paste0("Uni-MI-ORB (\u03b4 = ", Selection, ", s = ", stat_label, ")"),
+    logRR = estimate_logRR,
+    CI_low_log = ci_lower_logRR,
+    CI_up_log  = ci_upper_logRR,
+    RR         = exp(logRR),
+    CI_low_RR  = exp(CI_low_log),
+    CI_up_RR   = exp(CI_up_log)
+  ) %>%
+  dplyr::select(Model, logRR, CI_low_log, CI_up_log, RR, CI_low_RR, CI_up_RR)
+
+#  Results list for the existing models
+results_list <- list("Copas (ORBIT Adjusted) (FE)"        = copas_result_O1,
+                     "Saracini: Piecewise constant"       = resultLL_SeizureRed,
+                     "Saracini: Constant-Decreasing"      = resultLC_SeizureRed,
+                     "Saracini: Decreasing-Constant"      = resultCL_SeizureRed,
+                     "Saracini: Piecewise Decreasing (1)" = resultCC2_SeizureRed,
+                     "Saracini: Piecewise Decreasing (2)" = resultCC1_SeizureRed)
+
+# Extraction helper
+extract_model_estimates <- function(res, name) {
+  if (name == "Copas (ORBIT Adjusted) (FE)") {
+    mu  <- res$estimate_logRR
+    low <- res$ci_lower_logRR
+    up  <- res$ci_upper_logRR
+  } else {
+    mu  <- res$mu_adjusted_benefit
+    low <- res$LR_mu_adjusted_low
+    up  <- res$LR_mu_adjusted_up
+  }
+  
+  data.frame(Model      = name,
+             logRR      = mu,
+             CI_low_log = low,
+             CI_up_log  = up,
+             RR         = exp(mu),
+             CI_low_RR  = exp(low),
+             CI_up_RR   = exp(up))
+}
+
+df_other <- imap_dfr(results_list,
+                     extract_model_estimates)
+
+#  Stack all models together
+df_all_models <- bind_rows(df_naive_uni_O1,
+                           df_other, 
+                           df_logistic_formatted,
+                           df_naive_biv_O1,
+                           df_kirkham_O1,
+                           df_logistic_biv_O1)
+
+# Add a category variable for grouped coloring
+df_all_models <- df_all_models |>
+  mutate(
+    Category = case_when(
+      grepl("Naive", Model) ~ "Naive",
+      grepl("Copas", Model)      ~ "Copas",
+      grepl("Saracini", Model)   ~ "Saracini & Held",
+      grepl("Uni-MI-ORB", Model)   ~ "Uni-MI-ORB",
+      grepl("Biv-MI-ORB", Model)   ~ "Biv-MI-ORB",
+      grepl("Kirkham", Model)      ~ "Kirkham",
+      TRUE                       ~ "Other"
+    ),
+    Model = factor(Model, levels = rev(unique(Model)))
+  )
+```
+
+```{r}
+# Create label column "RR [CI_low, CI_up]"
+df_plot <- df_all_models |>
+  mutate(
+    # Format text: e.g. "3.22 [1.27, 8.65]"
+    label_text = sprintf("%.2f [%.2f, %.2f]", RR, CI_low_RR, CI_up_RR),
+    # Preserve vertical ordering
+    Model = factor(Model, levels = rev(unique(Model)))
+  )
+
+ggplot(df_plot, aes(x = logRR, y = Model, color = Category)) +
+  # Reference line at No Effect (RR = 1)
+  geom_vline(xintercept = 0, linetype = "dashed", color = "gray60") +
+  # Error bars and point estimates
+  geom_errorbarh(aes(xmin = CI_low_log, xmax = CI_up_log), width = 0.25, linewidth = 0.8) +
+  geom_point(shape = 18, size = 3.5) +
+  # Logarithmic scale with margin space for the text column
+  #scale_x_continuous(limits = c(x_min - 0.05 * x_range,x_max + 0.05 * x_range)) +
+  # Allow text to sit outside default clipping area if needed
+  coord_cartesian(clip = "off") +
+  labs(x = "Log RR", y = NULL, color = " ") +
+  theme_minimal(base_size = 12) +
+  theme(
+    panel.grid.minor = element_blank(),
+    legend.position  = "none",
+    plot.title       = element_text(face = "bold", hjust = 0),
+    axis.text.y      = element_text(face = "bold", color = "black"))
+
+ggsave("Plots_Paper/Forestplot_Comparison_O1.png", width = 10, height = 6)
+```
