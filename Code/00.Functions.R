@@ -403,8 +403,7 @@ run_bivariate_imputation <- function(data,
                       method = model_type,
                       rho = rho_b,       # NULL -> rho_B estimated; a value provided above -> rho_B fixed
                       tau2 = tau2_val,   # NULL -> estimated (application); value -> fixed (simulation)
-                      control = list(stepadj = 0.1,
-                                     rel.tol = 1e-5,
+                      control = list(rel.tol = 1e-5,
                                      iter.max = 200)) #https://stat.ethz.ch/pipermail/r-sig-meta-analysis/2020-November/002433.html
   
   # Construct Total Covariance Matrix Sigma
@@ -542,9 +541,8 @@ fit_imputations_biv <- function(mi_results,
              method = model_type,
              tau2 = tau2_fixed,
              rho = rho_fixed,
-             control = list(stepadj = 0.1,
-                            rel.tol = 1e-5,
-                            maxiter = 200)),
+             control = list(rel.tol = 1e-5,
+                            iter.max = 200)),
       error = function(e) NULL
     )
   })
@@ -675,62 +673,105 @@ adj_bivariate <- function(mi_results,
 # rho_w withing study correlation 
 # n_arm is fixed to 50 in the whole simulation 
 
-
 generate_bivariate_ma <- function(K = 12,
                                   theta = c(0.4, 0.4),
                                   tau2 = c(0.06, 0.06), 
-                                  rho_b = 0.4,
-                                  rho_w = 0.4, 
-                                  n_arm = 50) {
+                                  rho_b = 0.8,
+                                  rho_w = 0.8, 
+                                  n_arm = 50,
+                                  large_study = NULL,
+                                  large_n_arm = 250) {
   
+  # ------------------------------------------------------------
+  # Study-specific sample sizes
+  # ------------------------------------------------------------
+  
+  n_arm_i <- rep(n_arm, K)
+  
+  if (!is.null(large_study)) {
+    n_arm_i[large_study] <- large_n_arm
+  }
+  
+  # ------------------------------------------------------------
   # Between-study covariance matrix (Psi)
+  # ------------------------------------------------------------
+  
   cov_b <- rho_b * sqrt(tau2[1]) * sqrt(tau2[2])
-  Psi <- matrix(c(tau2[1], cov_b, cov_b, tau2[2]), 2, 2)
+  
+  Psi <- matrix(c(tau2[1], cov_b,
+                  cov_b, tau2[2]), 
+                2, 2)
   
   # True study-specific effects (bivariate normal)
-  theta_i <- matrix(MASS::mvrnorm(n = K,
-                                  mu = theta,
-                                  Sigma = Psi), 
-                    nrow = K, ncol = 2)  
+  theta_i <- MASS::mvrnorm(
+    n = K,
+    mu = theta,
+    Sigma = Psi
+  )
   
-  #  matrix V for Wishart distribution
-  V_scale <- (1 / ((n_arm - 1) * n_arm)) * matrix(c(1, rho_w, rho_w, 1), 2, 2)
-  df_wishart <- 2 * (n_arm - 1)
+  # ------------------------------------------------------------
+  # Initialize observed effects and standard errors
+  # ------------------------------------------------------------
   
-  # Initialize vectors for obs effects and standard errors
   y_obs <- matrix(NA, nrow = K, ncol = 2)
   se_obs <- matrix(NA, nrow = K, ncol = 2)
   
   for (i in 1:K) {
-    #  within-study covariance matrix for study i using Wishart (Sigma_i)
-    Sigma_i <- stats::rWishart(n = 1, df = df_wishart, Sigma = V_scale)[,,1]
     
-    # Draw observed effects (bivariate)
-    # sample the observed value from a Normal centerd in the true value (sampled above)
-    # and with variance from Widhart
-    y_obs[i, ] <- mvrnorm(n = 1, mu = theta_i[i, ], Sigma = Sigma_i)
+    # Study-specific sample size
+    n_i_arm <- n_arm_i[i]
+    
+    # Within-study covariance matrix for study i
+    V_scale <- (1 / ((n_i_arm - 1) * n_i_arm)) *
+      matrix(c(1, rho_w,
+               rho_w, 1), 2, 2)
+    
+    df_wishart <- 2 * (n_i_arm - 1)
+    
+    Sigma_i <- stats::rWishart(
+      n = 1,
+      df = df_wishart,
+      Sigma = V_scale
+    )[,,1]
+    
+    # Draw observed effects
+    y_obs[i, ] <- MASS::mvrnorm(
+      n = 1,
+      mu = theta_i[i, ],
+      Sigma = Sigma_i
+    )
     
     # Extract standard errors
     se_obs[i, 1] <- sqrt(Sigma_i[1, 1])
     se_obs[i, 2] <- sqrt(Sigma_i[2, 2])
   }
   
+  # ------------------------------------------------------------
+  # Output
+  # ------------------------------------------------------------
+  
   data <- data.frame(
     Study_id = 1:K,
-    n_total = 2 * n_arm,
-    O1_yi = y_obs[, 1], O1_sei = se_obs[, 1],
-    O2_yi = y_obs[, 2], O2_sei = se_obs[, 2]
+    n_total = 2 * n_arm_i,
+    O1_yi = y_obs[, 1],
+    O1_sei = se_obs[, 1],
+    O2_yi = y_obs[, 2],
+    O2_sei = se_obs[, 2]
   )
   
   attr(data, "theta1") <- theta[1]
   attr(data, "tau2_1") <- tau2[1]
-  attr(data, "n_arm") <- n_arm
+  attr(data, "n_arm") <- n_arm_i
   
   return(data)
 }
 
-
-
+data <- generate_bivariate_ma(
+  K = 12,
+  n_arm = 50,
+  #large_study = 1,
+  large_n_arm = 250
+)
 
 
 expit <- function(x) exp(x) / (1 + exp(x))
@@ -741,58 +782,62 @@ logit <- function(p) log(p / (1 - p))
 # delta value used in the simulation 
 # selection type 
 
-
-
 impose_orb <- function(data,
                        p1 = 0.4,
-                       delta_sim = 0.5, 
-                       select_type = "zscore", 
+                       delta_sim = 0.5,
+                       select_type = "zscore",
                        orb.se = TRUE,
-                       theta_1 = 0.4,       
-                       tau2_val = 0.06,     
-                       n_arm = 50) {
+                       theta_1 = 0.4,
+                       tau2_val = 0.06) { 
   
+  # Study-specific sample sizes
+  n_arm_i <- data$n_total / 2
   
-  n_total <- n_arm * 2 # we can safely assume that both arms have the same n
-  
-  
-  # Determine the selection variable s_1 and its expected value E(s_1)
-  if (select_type == "zscore") {
-    s1 <- data$O1_yi / data$O1_sei #vector of real value 
-    E_s1 <- theta_1 / sqrt((2/n_arm) + tau2_val) #expected score to define theoretical alpha
+  # Determine selection variable s_1 and its expected value 
+  if (select_type == "zscore") { 
+    # Observed selection variable 
+    s1 <- data$O1_yi / data$O1_sei 
+    # Study-specific theoretical expected z-score
+    E_s1 <- theta_1 / sqrt((2 / n_arm_i) + tau2_val) 
   } else if (select_type == "effect") {
+    # Selection directly on observed treatment effect
     s1 <- data$O1_yi 
-    E_s1 <- theta_1 # if we do selection on effect, the exp value is directly the true value
-  } else {
-    stop("select_type must be 'zscore' or 'effect'")
-  }
+    # Expected value does not depend on sample size
+    E_s1 <- rep(theta_1, nrow(data)) 
+  } else { 
+    stop("select_type must be 'zscore' or 'effect'") 
+  } 
   
-  target_reported <- 1 - p1
+  # Determine alpha such that the average reporting probability 
+  # corresponds approximately to the target reporting rate 
+  target_reported <- 1 - p1 
   
-  # Avoid logit of 1 or 0 if p1 is extreme (this should never happen in the code)
-  if(target_reported >= 1) target_reported <- 0.999 
-  if(target_reported <= 0) target_reported <- 0.001
+  # Avoid logit of 1 or 0 
+  if (target_reported >= 1) target_reported <- 0.999 
+  if (target_reported <= 0) target_reported <- 0.001 
   
-  alpha_1 <- logit(target_reported) - (delta_sim * E_s1)
+  # With heterogeneous sample sizes, use the mean expected 
+  # selection variable to define the common intercept. 
+  alpha_1 <- logit(target_reported) - (delta_sim * mean(E_s1)) 
   
-  # Calculate reporting probabilities for each outocme
-  prob_report <- expit(alpha_1 + delta_sim * s1)
+  # Reporting probabilities 
+  prob_report <- expit(alpha_1 + delta_sim * s1) 
   
-  # Simulate reporting or not (1 = reported, 0 = missing)
+  # Simulate reporting 
   reported_flag <- rbinom(n = nrow(data),
                           size = 1, 
-                          prob = prob_report)
+                          prob = prob_report) 
   
-  # Apply missingness to Outcome 1
-  data_orb <- data
-  data_orb$O1_yi[reported_flag == 0] <- NA
+  # Apply missingness to Outcome 1 
+  data_orb <- data 
+  data_orb$O1_yi[reported_flag == 0] <- NA 
   
-  if (orb.se) data_orb$O1_sei[reported_flag == 0] <- NA 
+  if (orb.se) { 
+    data_orb$O1_sei[reported_flag == 0] <- NA 
+  } 
   
-  # add the sample size column
-  data_orb$n_total <- n_total
+  # Actual missingness 
+  attr(data_orb, "actual_missing_rate") <- sum(reported_flag == 0) / nrow(data) 
   
-  attr(data_orb, "actual_missing_rate") <- sum(reported_flag == 0) / nrow(data)
-  
-  return(data_orb)
+  return(data_orb) 
 }
