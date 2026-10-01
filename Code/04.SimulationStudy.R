@@ -48,7 +48,6 @@ n_cores       <- 48
 # Scenario grid
 # ---------------------------------------------------------
 
-
 run_type <- "tryout"   # "tryout", "full_grid", "misspecified_delta", "different_rhos"
 
 # one folder per run
@@ -62,15 +61,13 @@ if (!dir.exists(save_dir)) dir.create(save_dir, recursive = TRUE)
 out_dir <- file.path("Data", "Sim_summary")
 if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
 
-
-
 scenarios_grid <- switch (run_type, 
                           "tryout" = expand.grid(
                             K           = c(6, 12, 25),
                             p1          = c(0.2),
                             tau2_val    = c(0, 0.02, 0.06, 0.36),
-                            theta_1     = c(0.4),
-                            theta_2     = c(0.4),
+                            theta_1     = c(0, 0.4),
+                            theta_2     = c(0, 0.4),
                             rho_b       = c(0.8),
                             rho_w       = c(0.8),
                             delta_sim   = seq(0, 1, by = 0.2),
@@ -78,7 +75,7 @@ scenarios_grid <- switch (run_type,
                             select_type = c("zscore", "effect"),
                             stringsAsFactors = FALSE
                           )  %>% unique() %>%
-                            dplyr::filter(delta_sim == delta_est),
+                            dplyr::filter(delta_sim == delta_est & theta_1 != theta_2),
                           
                           
                           
@@ -116,11 +113,11 @@ scenarios_grid <- switch (run_type,
                           
                           
                           "different_rhos" = expand.grid(
-                            K           = c(25),
+                            K           = c(6, 12, 25),
                             p1          = c(0.2),
                             tau2_val    = c(0, 0.02, 0.06, 0.36),
-                            theta_1     = c(0.4),
-                            theta_2     = c(0.4),
+                            theta_1     = c(0),
+                            theta_2     = c(0),
                             rho_b       = c(0, 0.8),
                             rho_w       = c(0, 0.8),
                             delta_sim   = seq(0, 1, by = 0.2),
@@ -133,12 +130,9 @@ scenarios_grid <- switch (run_type,
                           stop("unknown run_type: ", run_type)
 ) 
 
-
-
 total_scenarios <- nrow(scenarios_grid)
 cat(sprintf("Starting evaluation of %d simulation scenarios across %d system cores...\n",
             total_scenarios, n_cores))
-
 
 # ---------------------------------------------------------
 # Wrappers to handle two cases of errors:
@@ -224,8 +218,7 @@ run_ORB <- function(scenario_idx) {
   n_attempts <- 0
   n_unexpected_failures <- 0
   
-  
-  # LET'S COLLECT ALL ERROR MESSAGES
+  # collect all error messages
   error_log <- character(0)
   
   # instead of printing, add the error to the vector
@@ -254,7 +247,6 @@ run_ORB <- function(scenario_idx) {
       yi       = as.numeric(t(as.matrix(full_data[, c("O1_yi", "O2_yi")]))),
       sei      = as.numeric(t(as.matrix(full_data[, c("O1_sei", "O2_sei")])))
     )
-    
     
     # IDEA: we want to see the results a statistician would get if there was NO ORB
     # of course also this smart statistician would need to estimate rho_w with pearson 
@@ -351,6 +343,7 @@ run_ORB <- function(scenario_idx) {
     res_df <- tryCatch({
       
       n_redraws <- 0
+      redraw_diag <- list()   # one entry per attempt (accepted or rejected)
       
       repeat {
         
@@ -373,11 +366,14 @@ run_ORB <- function(scenario_idx) {
         
         n_reported <- sum(!is.na(obs_data$O1_yi))
         n_missing  <- sum(is.na(obs_data$O1_yi))
+        accepted   <- (n_reported >= 4 && n_missing >= 1)
         
-        if (n_reported >= 4 && n_missing >= 1) {
-          break
-        }
+        redraw_diag[[length(redraw_diag) + 1]] <- data.frame(
+          missing_rate = attr(obs_data, "actual_missing_rate"),
+          accepted     = accepted
+        )
         
+        if (accepted) break
         n_redraws <- n_redraws + 1
         
         # Avoid an infinite loop in extremely difficult scenarios, it will never happen c'mon
@@ -391,6 +387,8 @@ run_ORB <- function(scenario_idx) {
       if (n_redraws > 0) {
         n_redraw_repetitions <- n_redraw_repetitions + 1
       }
+      
+      redraw_diag_df <- do.call(rbind, redraw_diag)
       
       # -----------------------------------------------------
       # 1. FULL (always from full_data)
@@ -499,6 +497,8 @@ run_ORB <- function(scenario_idx) {
         naive_success = naive_success,
         uni_success = uni_success,
         biv_success = biv_success,
+        mean_missing_rate_all_attempts = mean(redraw_diag_df$missing_rate),
+        missing_rate_accepted = redraw_diag_df$missing_rate[redraw_diag_df$accepted],
         
         n_complete_pairs = naive_res$n_complete_pairs,
         
@@ -633,8 +633,6 @@ run_ORB <- function(scenario_idx) {
                            res_common$biv_ci_u,
                            true_theta)
   
-  # failure_rate <- (n_attempts - n_success) / n_attempts
-  
   avg_redraws <- if (n_eligible > 0) {
     redraws_total / n_eligible
   } else {
@@ -659,6 +657,8 @@ run_ORB <- function(scenario_idx) {
     # -----------------------------
     # Assessing missingness
     # -----------------------------
+    Mean_Missing_Rate_All_Attempts = mean(res_df$mean_missing_rate_all_attempts, na.rm = TRUE),
+    Mean_Missing_Rate_Accepted     = mean(res_df$missing_rate_accepted, na.rm = TRUE),
     N_Eligible = n_eligible,
     N_Attempts = n_attempts,
     N_Unexpected_Failures = n_unexpected_failures,
@@ -689,7 +689,7 @@ run_ORB <- function(scenario_idx) {
     Failure_Rate_Biv = biv_m$Failure_Rate,
     
     # -----------------------------
-    # Complete-data benchmark
+    # Complete data benchmark
     # -----------------------------
     
     Bias_Full = full_m$Bias,
@@ -770,12 +770,12 @@ run_ORB <- function(scenario_idx) {
 
 
 # Using native mclapply at scenario level to eliminate data transfer friction
-invisible ( mclapply(
+invisible(mclapply(
   X = 1:total_scenarios,
   FUN = run_ORB,
   mc.cores = n_cores,
   mc.preschedule = FALSE # CRITICAL: Dynamic balancing so slow scenarios don't stall cores
-) )
+))
 
 # save data
 cat("\nAll scenario files calculated. Merging to master data frame... ")
