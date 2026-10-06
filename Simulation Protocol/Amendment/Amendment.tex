@@ -1,0 +1,268 @@
+\documentclass[11pt]{article}
+\usepackage{graphicx} % Required for inserting images
+\usepackage[utf8]{inputenc}
+\usepackage[hidelinks]{hyperref}
+\usepackage{fontawesome5}
+\usepackage{eso-pic}
+\usepackage{charter}
+\usepackage{geometry}
+\usepackage{multirow}
+\usepackage{multicol}
+\usepackage{amsmath}
+\usepackage{adjustbox}
+\usepackage{todonotes}
+\usepackage{caption} 
+\usepackage{rotating}
+\usepackage{xcolor}
+\usepackage{blindtext}
+\usepackage{titlesec}
+\usepackage{paralist}
+
+\usepackage{hyperref}
+%\usepackage[square,numbers,compress,sort]{natbib}
+\bibliographystyle{unsrtnat}
+
+% Zeilenabstand vergrößern
+%\usepackage{setspace}
+%\setstretch{1.2}
+
+% Seitenabstand
+ \newgeometry{
+     top=2cm,
+     bottom = 2cm,
+%     bottom=1in,
+     outer=1in,
+     inner= 1in
+ }
+
+% Bibliography
+% numeric-comp prints references as 1-3 and not 1,2,3
+% giveninits prints only the initials of the first two names
+% sorting = none to have the references in order of appearance
+% maxbinames to show the names of all authors and not et al.
+\usepackage[backend = biber,
+style = numeric-comp,
+giveninits = true,  
+maxbibnames = 99,
+sorting = none,
+isbn = false,
+doi = false
+] {biblatex}
+
+% Create a custom date format for Vancouver (Day Month Year)
+\DeclareFieldFormat{urldate}{%
+  Accessed\space
+  \thefield{urlday}\space
+  \mkbibmonth{\thefield{urlmonth}}\space
+  \thefield{urlyear}}
+
+% Force the English language module to stop adding dots to abbreviations
+\DefineBibliographyExtras{english}{%
+  \protected\def\mkbibmonth#1{%
+    \ifcase#1\or Jan\or Feb\or Mar\or Apr\or May\or June\or
+    July\or Aug\or Sept\or Oct\or Nov\or Dec\fi}%
+}
+
+% Keep current custom urldate format
+\DeclareFieldFormat{urldate}{Accessed\space\thefield{urlday}\space\mkbibmonth{\thefield{urlmonth}}\space\thefield{urlyear}}
+
+\renewbibmacro*{urldate}{\printurldate}
+
+\renewbibmacro{in:}{} % remove "In" in front of journal
+% Force Family Name first for all authors
+\DeclareNameAlias{default}{family-given}
+% Remove quotation marks from titles
+\DeclareFieldFormat[article]{title}{#1}
+
+% make sure journal is not in italics
+\DeclareFieldFormat[article]{journaltitle}{#1}
+% Remove "pp." prefix from pages
+\DeclareFieldFormat[article]{pages}{#1}
+% Format article entries: Author. Title. Journal. Year;Volume:Pages.
+%  Custom Driver for: Family GI. Title. Journal. Year;Vol:Pages.
+\DeclareBibliographyDriver{article}{%
+  \usebibmacro{author}%
+  \setunit{\adddot\space}\newblock
+  \usebibmacro{title}%
+  \setunit{\adddot\space}\newblock
+  \printfield{journaltitle}%
+  \setunit{\adddot\space}%
+  \printfield{year}%
+  \setunit{\addsemicolon}%
+  \printfield{volume}%
+  \setunit{\addcolon}%
+  \printfield{pages}%
+  \usebibmacro{finentry}
+}
+
+
+\addbibresource{references.bib}
+
+\title{\textbf{Simulation Study Protocol Amendment 1} \\
+Adjusting for Outcome Reporting Bias in Meta-analysis: A Multiple Imputation Approach \\
+\author{Cora Burgwinkel, Saverio Fontana and Leonhard Held\\ 
+Epidemiology, Biostatistics
+and Prevention Institute (EBPI)\\ 
+and Center for Reproducible Science and Research Synthesis (CRS) \\
+University of Zurich (UZH)}}
+
+\date{}
+
+\input{newCommands}
+
+\begin{document}
+
+\maketitle
+
+
+\tableofcontents
+\thispagestyle{empty}
+\newpage
+
+\setcounter{page}{1}
+
+\section{Purpose of amendment}
+The simulation study was conducted according to the prespecified simulation protocol, with several modifications introduced during the implementation. These modifications were made primarily to improve computational feasibility, to extend the evaluation of the proposed method to additional simulation settings, and to address comments and suggestions raised during peer review of the manuscript.
+\noindent
+The main modifications were:
+
+\begin{itemize}
+    \item revision of the grid of correlation parameters,
+    \item revision of the range of the selection parameter used to generate outcome reporting bias (ORB),
+    \item incorporation of an additional selection mechanism based on the treatment effect,
+    \item reduction of the number of imputations used within the multiple imputation from $M=1000$ to $M=200$,
+    \item addition of confidence interval (CI) width as a performance measure,
+    \item extension of the data-generating mechanism to allow heterogeneous study sizes, including one larger study with $n_{i^\ast} = 500$ participants,
+    \item redrawing of inadmissible simulated datasets and method-wise handling of failed analyses.
+\end{itemize}
+
+All modifications are described below. Unless stated otherwise, all aspects of the data-generating mechanism, simulation design, ORB mechanism, estimation procedure, and performance evaluation remained as specified in the original protocol. 
+
+\section{Data-generating mechanism}
+\subsection{Step 1: Simulation of bivariate meta-analysis}
+
+\subsubsection{Heterogeneous study sizes}
+The original protocol assumed equal study sizes across all studies, with $n_i=n_{ti}+n_{ci}=100, n_{ti}=n_{ci}=50$ for study $i$.
+To assess the robustness of the simulation results to variation in study size, the amended simulation study additionally considers a heterogeneous study size scenario. In this scenario, one study $i^\ast$ within each simulated meta-analysis is assigned a total sample size of $n_{i^\ast}=500$,
+with $n_{ti^\ast}=n_{ci^\ast}=250$, while all remaining studies retain the original sample size of $n_i=100$, with $n_{ti}=n_{ci}=50.$
+Thus, one study in each simulated meta-analysis has a total sample size that is five times larger than that of the other studies. The larger study is generated according to the same data-generating mechanism for the treatment effects and within-study correlation as the other studies. Its larger sample size results in greater statistical precision. Heterogeneous study sizes are considered only for a subset of simulation scenarios, namely \ie $\theta_1 = \theta_2 = 0.4$, $\rho_W = \rho_B = 0.8$ and $p_1 = 20\%$.
+This amendment addresses the simplifying assumption of equal study sizes in the original protocol and evaluates whether the performance of the ORB-adjustment method is robust when meta-analyses contain studies with different levels of statistical precision. The heterogeneous study size scenario was also introduced in response to reviewer comments concerning the generalizability of the simulation design.
+
+\subsubsection{Revision of the correlation parameter grid}
+The correlation parameter grid was reduced relative to the original simulation protocol to limit the number of simulation scenarios while retaining correlation structures that are relevant to clinical trial data. In the original protocol, both the between-study correlation ($\rho_B$) and the within-study correlation ($\rho_W$) were varied over the values $\{0, 0.4, 0.8\}$.
+
+The choice of correlation values was informed by empirical applications of multivariate meta-analysis in clinical trials. Within-study correlations can vary considerably depending on the outcomes under consideration. For example, Riley et al. \cite{riley2015multivariate} estimated within-study correlations between treatment effects on systolic and diastolic blood pressure ranging from 0.45 to 0.79 across 10 hypertension trials. Hattle et al. \cite{hattle2022multivariate}, based on 43 Cochrane intervention reviews, considered 0.8 to represent a plausible high within-study correlation when the correlation is unknown. In contrast, substantially smaller correlations have also been reported. Daniels and Hughes \cite{daniels1997meta}, for example, assessed the association between changes in CD4 cell count and time to development of AIDS or death in drug trials of patients with HIV and reported an average within-study correlation of -0.08 across 15 trials. Similarly, Glas et al. \cite{glas2003tumor} reported a within-study correlation of 0 in a meta-analysis of tumour markers for the diagnosis of primary bladder cancer. 
+
+Empirical evidence regarding between-study correlations is more limited, as these correlations are generally difficult to estimate reliably, particularly when the number of studies is small. Nevertheless, substantial positive between-study correlations have been observed in clinical applications. For example, Riley et al. \cite{riley2015multivariate} estimated a between-study correlation of 0.78 between treatment effects on systolic and diastolic blood pressure across 10 hypertension trials. Other applications have yielded estimates close to the boundaries of the parameter space. However, methodological work has demonstrated that extreme or boundary estimates of the between-study correlation can occur frequently when the number of studies is small and should therefore not necessarily be interpreted as evidence of an underlying correlation close to $\pm1$ \cite{riley2007bivariate}.
+
+Based on these considerations, the amended simulation study focuses on two correlation scenarios for each correlation parameter, representing no correlation and a strong positive correlation: $\rho_B \in \{0, 0.8\}, \rho_W \in \{0, 0.8\}.$ This choice is based on previous multivariate meta-analysis simulation studies in the literature \cite{kirkham2012multivariate, riley2007bivariate}.
+
+The within-study correlation $\rho_W$ will be estimated using the Pearson correlation among studies with both outcomes reported. This approach follows the strategy used by Kirkham et al. \cite{kirkham2012multivariate}, who proposed to use the Pearson correlation of the observed effect estimates as an empirical estimate of the correlation when the within-study covariance was unavailable. We will consider the Pearson correlation as a single global correlation. It would additionally be of interest to investigate $\rho_W$ over a broader range of fixed values, for example, using values informed by the uncertainty around the estimated Pearson correlation. However, this extension would substantially increase the number of simulation scenarios and was not computationally feasible within the scope of the current simulation study. The amended simulation therefore focuses on the two prespecified values of $\rho_W$ for generating the study-specific effect estimates from a bivariate normal distribution. For $\rho_W$ and $\rho_B$, we have four combinations: $(0, 0)$, $(0, 0.8)$, $(0.8, 0)$ and $(0.8, 0.8)$. The main simulation run varies $\rho_W$ and $\rho_B$ jointly, \ie the combinations $(0, 0)$ and $(0.8, 0.8)$. For those scenarios, the within- and between-study correlations are equal. This corresponds to a global correlation approach, as proposed by Kirkham et al. \cite{kirkham2012multivariate}. The two other combinations, \ie $(0, 0.8)$ and $(0.8, 0)$, are examined in sensitivity analyses for a smaller set of scenarios, \ie $\theta_1 = \theta_2 = 0.4$ and $p_1 = 20\%$.
+
+\subsubsection{Reduction of the treatment effect parameter grid}
+The grid of treatment effect parameters was reduced compared to the original protocol. This modification was made to reduce the number of simulation scenarios while retaining a range of relevant treatment effects. The original protocol considered $\theta_1,\theta_2 \in \{0,0.4,0.8\}.$ The amended simulation study uses the following values: $\theta_1,  \theta_2 \in \{0, 0.4\}.$ 
+
+\subsection{Step 2: Simulation of ORB}
+\subsubsection{Revision of the selection parameter}
+The range of the selection parameter used to generate ORB was revised from that specified in the original protocol.
+The original protocol considered $\delta_{1,\mathrm{sim}} \in \{0,0.1,\ldots,1.3\}.$ The amended simulation study uses
+$\delta_{1,\mathrm{sim}} \in {\text\{0, 0.2,\ldots, 1\}}.$ The selection parameter used during estimation, $\delta_{1,\mathrm{est}},$ was likewise modified.
+The revised range was chosen to retain the range of selection weights while reducing the total number of simulation scenarios.
+
+\subsubsection{Additional selection on treatment effect}
+
+In addition to the selection mechanism based on the z-score, $\operatorname{expit}(\alpha_1 + \delta_{1,\mathrm{sim}} z_{i1})$, an additional selection mechanism based on the treatment effect was evaluated. Under both mechanisms, the probability that outcome 1 is reported is modeled as
+\begin{equation*}
+    \Pr(R_{i1} = 1 \mid s_{i1}) = \operatorname{expit}\left(\alpha_1 + \delta_{1,\mathrm{sim}} s_{i1}\right),
+\end{equation*}
+where $R_{i1}$ denotes the reporting indicator, $s_{i1}$ is the study-specific selection variable ($s_{i1} = \hat{\theta}_{i1}$ for treatment effect selection, and $s_{i1} = z_{i1}$ for z-score selection), and $\delta_{1,\mathrm{sim}}$ governs the strength of selection.
+To anchor the overall reporting proportion at a target marginal rate of $1 - p_1$, the intercept $\alpha_1$ is calibrated via
+\begin{equation*}
+    \alpha_1 = \operatorname{logit}(1 - p_1) - \delta_{1,\mathrm{sim}} \overline{\mathbb{E}(s_1)},
+\end{equation*}
+where $\overline{\mathbb{E}(s_1)} = \frac{1}{K} \sum_{i=1}^{K} \mathbb{E}(s_{i1})$ is the average expected selection variable across the $K$ studies in a meta-analysis.
+
+\begin{itemize}
+    \item Selection on treatment effect ($s_{i1} = \hat{\theta}_{i1}$): 
+    Since $\mathbb{E}(\hat{\theta}_{i1}) = \theta_1$ across all studies irrespective of sample size, $\overline{\mathbb{E}(s_1)} = \theta_1$. Consequently, sample size heterogeneity does not alter the calibration for selection on the treatment-effect.
+
+    \item Selection on z-score ($s_{i1} = z_{i1}$):
+    The expected standardized effect under the data-generating mechanism depends explicitly on the study sample size $n_i$:
+    \begin{equation*}
+        \mathbb{E}(z_{i1}) \approx \frac{\mathbb{E}(\hat{\theta}_{i1})}{\sqrt{\mathbb{E}(\hat{\sigma}^2_{i1}) + \tau_1^2}} = \frac{\theta_1}{\sqrt{4/n_i + \tau_1^2}},
+    \end{equation*}
+    assuming equal allocation ($n_{ti} = n_{ci} = n_i/2$). Under the heterogeneous study size design with one large study ($n_{i^\ast} = 500$) and $K-1$ standard studies ($n_i = 100$ for $i \neq i^\ast$), the average expected z-score is evaluated as:
+    \begin{equation*}
+        \overline{\mathbb{E}(z_1)} = \frac{1}{K} \left[ \frac{\theta_1}{\sqrt{4/500 + \tau_1^2}} + (K - 1) \frac{\theta_1}{\sqrt{4/100 + \tau_1^2}} \right].
+    \end{equation*}
+\end{itemize}
+This calibration ensures the overall reporting mechanism remains centered on the target rate $1 - p_1$ across the meta-analysis, while properly reflecting the higher expected z-score and greater reporting likelihood of the larger study.
+
+\subsection{Summary of all considered simulation scenarios}
+
+Table \ref{tab:SimStudy} provides an updated overview of the key factors and parameter values investigated in the simulation study. The design systematically varies characteristics of the meta-analysis (\eg number of studies in the meta-analysis and between-study heterogeneity) and parameters governing the missingness mechanism. The main scenario that will be considered is $\theta_1 = \theta_2 = 0.4$, $\rho_W = \rho_B = 0.8$ and $p_1 = 20\%$. Only for this main scenario, the heterogeneous study size and model misspecification will be investigated.
+
+\begin{table}[]
+\captionsetup{justification=centering}
+\caption{Overview of investigated parameters in the simulation study.}
+\label{tab:SimStudy}
+\begin{adjustbox}{width=1\textwidth, center=\textwidth}
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Name}              & \textbf{Investigated values}  & \textbf{Description} \\ \hline
+$K$    & 6, 12, 25    & Number of studies in the meta-analysis.  \\ \hline
+$n_i$ & \begin{tabular}[c]{@{}l@{}}
+100 for all studies;\\
+one study with 500 in selected scenarios
+\end{tabular}
+& \begin{tabular}[c]{@{}l@{}}
+Total sample size per study. Equal size scenarios have $n_{ti}=n_{ci}=50$.\\
+In the heterogeneous size scenarios, one study $i^*$ has $n_{ti^*}=n_{ci^*}=250$, \\ 
+while all other studies retain $n_{ti}=n_{ci}=50$. Heterogeneous sizes \\
+are considered for $\theta_1=\theta_2=0.4$,
+$\rho_W=\rho_B=0.8$, and $p_1=20\%$.
+\end{tabular}
+\\ \hline
+$p_1$  & \begin{tabular}[c]{@{}l@{}} 20\%, 40\% \\\end{tabular} & \begin{tabular}[c]{@{}l@{}}Outcome-specific proportions of unreported study outcomes\\ are investigated to reflect unreporting for outcome 1.\end{tabular}      \\ \hline
+$\tau_j^2$    & 0, 0.02, 0.06, 0.36     & \begin{tabular}[c]{@{}l@{}}Between-study heterogeneity variances equal across outcomes $j = 1, 2$.\end{tabular}   \\ \hline
+$\theta_1$    & 0, 0.4    & \begin{tabular}[c]{@{}l@{}}True overall treatment effect for outcome 1.\end{tabular}    \\ \hline
+$\theta_2$    & 0, 0.4    & \begin{tabular}[c]{@{}l@{}}True overall treatment effect for outcome 2.\end{tabular}    \\ \hline
+$\rho_B$ & 0, 0.8 & Between-study correlation.
+\\ \hline $\rho_W$  & \begin{tabular}[c]{@{}l@{}}
+0, 0.8
+\end{tabular}    & Within-study correlation.  \\ \hline
+$\delta_{1,\text{sim}}$     & 0 - 1 in steps of 0.2    & \begin{tabular}[c]{@{}l@{}}Selection weight in simulation is varied to assess its\\ impact on the  adjusted estimates.\end{tabular}     \\ \hline
+$\delta_{1,\text{est}}$     & 0 - 1 in steps of 0.2    & \begin{tabular}[c]{@{}l@{}}Selection weight in estimation is varied to assess its\\ impact on the adjusted estimates.\end{tabular}     \\ \hline
+$s_{1}$     & $z_1$, $\hat\theta_1$    & \begin{tabular}[c]{@{}l@{}}Selection variable for either selection on\\ the $z$-score or selection on the treatment effect.\end{tabular}     \\ \hline
+$M$    & 200  & Number of imputations per simulation repetition.    \\ \hline
+$n_{\text{sim}}$    & 1900  & Number of simulation repetitions per scenario.    \\ \hline
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\subsection{Reduction in the number of imputations}
+
+The original protocol specified $M = 1000$ imputations within each simulation replicate. During preliminary simulation runs, this number was found to impose a substantial computational burden because each imputed dataset required subsequent meta-analysis model fitting. To improve computational feasibility, the number of imputations was reduced to $M = 200$. A comparison using the application data showed that reducing the number of imputations to $M = 200$ did not affect the conclusions compared with $M = 1000$ (supplementary material of the manuscript).
+
+\section{Performance measures}
+
+Confidence interval (CI) width was added as an additional performance measure to assess the precision of the considered estimates. To get the CI width, we calculated the mean of the upper CI bound minus the lower CI bound across simulation replicates. Smaller values indicate greater precision, provided that the CIs maintain the intended coverage probability. CI width is therefore interpreted jointly with coverage probability rather than as a standalone measure of estimator performance.
+
+\section{Other}
+
+\subsection{Reproducibility}
+We will upload the simulation protocol to OSF and GitHub as amendment to the original simulation study protocol. The \href{https://github.com/cburgwin/ORB-project-MI-Approach/tree/main}{GitHub} repository will contain both the R scripts of the simulations, and the files used to obtain the PDF of the reports, including this protocol. The GitHub repository further provides releases differentiating between the materials for the initial submission and after the peer review. 
+
+\subsection{Statistical Software}
+To avoid oversubscription of computational resources when running simulations in parallel, the number of BLAS and OpenMP threads will be restricted to one per process using the \texttt{RhpcBLASctl} R package. Simulations will be run in parallel using the \texttt{mclapply} function from the \texttt{parallel} R package, with 48 cores and dynamic scheduling (\texttt{mc.preschedule = FALSE}) to distribute simulation scenarios across available cores. The \texttt{L'Ecuyer-CMRG} random-number generator will be used, and a scenario-specific seed will be set based on the scenario index. For each scenario, the random-number generator was initialized using a seed defined as 100 plus the scenario index, ensuring reproducibility of the random-number generation within each scenario.
+
+\subsection{Missingness}
+Missingness and computational failures will be distinguished according to their source. First, because fitting a bivariate random-effects meta-analysis model requires at least four studies reporting each outcome to reliably estimate the between-study variance-covariance structure \cite{macaskill2010cochrane}, simulated datasets with fewer than four reported studies will be considered inadmissible and will be redrawn. This represents a revision of the original simulation protocol, in which datasets with fewer than four reported studies for the naive estimate were retained and the corresponding estimate was recorded as NA. We changed this approach because such datasets do not provide sufficient information for the prespecified bivariate analyses and therefore do not constitute meaningful simulation repetitions for evaluating the method. The number of redraws required to obtain an admissible dataset is recorded for each simulation scenario. For each simulation repetition, at most 100 redraws are made. If no admissible dataset is obtained within 100 redraws, the attempt is discarded and a new repetition is started. Redraws will be distinguished from failures of the statistical methods themselves. However, this presents a limitation of our simulation study setup because the retained simulated datasets are conditioned on a minimum reporting rate, which introduces a mild truncation of the nominal reporting rate for outcome 1 implied by $p_1$. We will report the realized proportion of unreported outcomes among the accepted datasets. In addition, we require at least one study outcome for outcome 1 to be unreported, since the objective of the simulation is to evaluate methods for correcting ORB. Datasets in which all studies report outcome 1, and therefore contain no missingness to be addressed by the ORB adjustment methods, will be redrawn. Thus, retained datasets contain both sufficient information for the prespecified analyses and at least one unreported outcome 1. The goal is to have 1,900 admissible repetitions for each simulation scenario. As a safety limit, at most 9,500 attempts ($5 \times n_{\text{sim}}$) are made per scenario, where an attempt counts as failed if it reaches the redraw limit or if the data generation fails. 
+
+For each admissible simulated dataset, the complete data, naive, univariate ORB adjusted, and bivariate ORB adjusted estimates will be evaluated independently. Failure of one analysis will not lead to exclusion of the corresponding simulation repetition from the other analyses. Computational errors and non-convergence will be recorded separately for each method. Thus, the primary performance measures for each method will be calculated using all admissible repetitions for which that method produced a valid estimate and CI (referred to as method-wise deletion \cite{pawel2025handling}). The number and proportion of valid analyses will be reported alongside performance measures to make the extent of computational failure explicit. As a sensitivity analysis, a so-called repetition-wise deletion analysis (see Pawel et al. 2025 \cite{pawel2025handling} for a definition) will be conducted in which only simulation repetitions for which all methods successfully produced results were retained. Bias, mean squared error, coverage, and CI width will be recalculated for all methods using this common set of repetitions. This analysis assesses whether comparisons between methods are affected by differences in the simulation repetitions contributing to each method-specific estimate.
+
+\addcontentsline{toc}{section}{References}
+\sloppy
+\printbibliography
+
+\end{document}
