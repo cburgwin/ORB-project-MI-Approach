@@ -48,7 +48,7 @@ n_cores       <- 48
 # Scenario grid
 # ---------------------------------------------------------
 
-run_type <- "tryout"   # "tryout", "full_grid", "misspecified_delta", "different_rhos"
+run_type <- "heterogeneous_size"   # "tryout", "full_grid", "misspecified_delta", "different_rhos"
 
 # one folder per run
 run_tag <- paste0(run_type, "_", Sys.Date())
@@ -66,8 +66,8 @@ scenarios_grid <- switch (run_type,
                             K           = c(6, 12, 25),
                             p1          = c(0.2),
                             tau2_val    = c(0, 0.02, 0.06, 0.36),
-                            theta_1     = c(0, 0.4),
-                            theta_2     = c(0, 0.4),
+                            theta_1     = c(0),
+                            theta_2     = c(0),
                             rho_b       = c(0.8),
                             rho_w       = c(0.8),
                             delta_sim   = seq(0, 1, by = 0.2),
@@ -75,8 +75,7 @@ scenarios_grid <- switch (run_type,
                             select_type = c("zscore", "effect"),
                             stringsAsFactors = FALSE
                           )  %>% unique() %>%
-                            dplyr::filter(delta_sim == delta_est & theta_1 != theta_2),
-                          
+                            dplyr::filter(delta_sim == delta_est),
                           
                           
                           "full_grid" = expand.grid(
@@ -95,7 +94,6 @@ scenarios_grid <- switch (run_type,
                             dplyr::filter(delta_sim == delta_est & rho_w == rho_b),
                           
                           
-                          
                           "misspecified_delta" = expand.grid(
                             K           = c(6, 12, 25),
                             p1          = c(0.2),
@@ -110,6 +108,22 @@ scenarios_grid <- switch (run_type,
                             stringsAsFactors = FALSE
                           )  %>% unique() %>%
                             dplyr::filter(delta_sim != delta_est),
+                          
+                          "heterogeneous_size" = expand.grid(
+                            K           = c(6, 12, 25),
+                            p1          = c(0.2),
+                            tau2_val    = c(0, 0.02, 0.06, 0.36),
+                            theta_1     = c(0.4),
+                            theta_2     = c(0.4),
+                            rho_b       = c(0.8),
+                            rho_w       = c(0.8),
+                            delta_sim   = seq(0, 1, by = 0.2),
+                            delta_est   = seq(0, 1, by = 0.2),
+                            select_type = c("zscore", "effect"),
+                            size_design = c("heterogeneous"),
+                            stringsAsFactors = FALSE
+                          ) %>% unique() %>%
+                            dplyr::filter(delta_sim == delta_est),
                           
                           
                           "different_rhos" = expand.grid(
@@ -206,6 +220,7 @@ run_ORB <- function(scenario_idx) {
   p1          <- s$p1
   select_type <- s$select_type
   delta_est   <- s$delta_est
+  size_design <- s$size_design 
   
   true_theta  <- theta_1
   
@@ -352,7 +367,10 @@ run_ORB <- function(scenario_idx) {
                                            theta = c(theta_1, theta_2),
                                            tau2 = c(tau2_val, tau2_val),
                                            rho_b = rho_b,
-                                           rho_w = rho_w)
+                                           rho_w = rho_w,
+                                           n_arm = 50,
+                                           large_study  = if (!is.null(size_design) && size_design == "heterogeneous") 1L else NULL,
+                                           large_n_arm  = 250)
         
         # Introduce ORB
         obs_data <- impose_orb(full_data,
@@ -361,8 +379,7 @@ run_ORB <- function(scenario_idx) {
                                select_type = select_type,
                                orb.se = TRUE,
                                theta_1 = theta_1,
-                               tau2_val = tau2_val,
-                               n_arm = 50)
+                               tau2_val = tau2_val)
         
         n_reported <- sum(!is.na(obs_data$O1_yi))
         n_missing  <- sum(is.na(obs_data$O1_yi))
@@ -644,6 +661,7 @@ run_ORB <- function(scenario_idx) {
     # Scenario parameters
     scenario_idx = scenario_idx,
     K = K,
+    size_design = if (is.null(size_design)) "homogeneous" else size_design,
     theta_1 = theta_1,
     theta_2 = theta_2,
     tau2_val = tau2_val,

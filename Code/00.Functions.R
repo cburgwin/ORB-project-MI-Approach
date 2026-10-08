@@ -85,7 +85,10 @@ run_univariate_imputation <- function(data,
   # Fit REML on the reported data (Naive Estimate), save estimate & SE
   res_naive <- metafor::rma(yi = data_rep[[theta_col]],
                             sei = data_rep[[se_col]],
-                            method = model_type)
+                            method = model_type,
+                            control = list(stepadj = 0.1,
+                                           rel.tol = 1e-5,
+                                           maxiter = 200))
   theta_MA <- as.numeric(res_naive$beta)
   tau2_hat <- as.numeric(res_naive$tau2)
   SE2_mean <- res_naive$se^2
@@ -115,8 +118,6 @@ run_univariate_imputation <- function(data,
   imputed_draws <- MASS::mvrnorm(n = m, 
                                  mu = mu_cond, 
                                  Sigma = Sigma_cond)
-  
-  
   return(list(
     imp_draws  = imputed_draws,
     unrep_idx    = unrep_idx,
@@ -682,20 +683,14 @@ generate_bivariate_ma <- function(K = 12,
                                   large_study = NULL,
                                   large_n_arm = 250) {
   
-  # ------------------------------------------------------------
   # Study-specific sample sizes
-  # ------------------------------------------------------------
-  
   n_arm_i <- rep(n_arm, K)
   
   if (!is.null(large_study)) {
     n_arm_i[large_study] <- large_n_arm
   }
   
-  # ------------------------------------------------------------
   # Between-study covariance matrix (Psi)
-  # ------------------------------------------------------------
-  
   cov_b <- rho_b * sqrt(tau2[1]) * sqrt(tau2[2])
   
   Psi <- matrix(c(tau2[1], cov_b,
@@ -703,16 +698,11 @@ generate_bivariate_ma <- function(K = 12,
                 2, 2)
   
   # True study-specific effects (bivariate normal)
-  theta_i <- MASS::mvrnorm(
-    n = K,
-    mu = theta,
-    Sigma = Psi
-  )
+  theta_i <- MASS::mvrnorm(n = K,
+                           mu = theta,
+                           Sigma = Psi)
   
-  # ------------------------------------------------------------
   # Initialize observed effects and standard errors
-  # ------------------------------------------------------------
-  
   y_obs <- matrix(NA, nrow = K, ncol = 2)
   se_obs <- matrix(NA, nrow = K, ncol = 2)
   
@@ -728,36 +718,27 @@ generate_bivariate_ma <- function(K = 12,
     
     df_wishart <- 2 * (n_i_arm - 1)
     
-    Sigma_i <- stats::rWishart(
-      n = 1,
-      df = df_wishart,
-      Sigma = V_scale
-    )[,,1]
+    Sigma_i <- stats::rWishart(n = 1,
+                               df = df_wishart,
+                               Sigma = V_scale)[,,1]
     
     # Draw observed effects
-    y_obs[i, ] <- MASS::mvrnorm(
-      n = 1,
-      mu = theta_i[i, ],
-      Sigma = Sigma_i
-    )
+    y_obs[i, ] <- MASS::mvrnorm(n = 1,
+                                mu = theta_i[i, ],
+                                Sigma = Sigma_i)
     
     # Extract standard errors
     se_obs[i, 1] <- sqrt(Sigma_i[1, 1])
     se_obs[i, 2] <- sqrt(Sigma_i[2, 2])
   }
   
-  # ------------------------------------------------------------
   # Output
-  # ------------------------------------------------------------
-  
-  data <- data.frame(
-    Study_id = 1:K,
-    n_total = 2 * n_arm_i,
-    O1_yi = y_obs[, 1],
-    O1_sei = se_obs[, 1],
-    O2_yi = y_obs[, 2],
-    O2_sei = se_obs[, 2]
-  )
+  data <- data.frame(Study_id = 1:K,
+                     n_total = 2 * n_arm_i,
+                     O1_yi = y_obs[, 1],
+                     O1_sei = se_obs[, 1],
+                     O2_yi = y_obs[, 2],
+                     O2_sei = se_obs[, 2])
   
   attr(data, "theta1") <- theta[1]
   attr(data, "tau2_1") <- tau2[1]
@@ -765,14 +746,6 @@ generate_bivariate_ma <- function(K = 12,
   
   return(data)
 }
-
-data <- generate_bivariate_ma(
-  K = 12,
-  n_arm = 50,
-  #large_study = 1,
-  large_n_arm = 250
-)
-
 
 expit <- function(x) exp(x) / (1 + exp(x))
 logit <- function(p) log(p / (1 - p))
