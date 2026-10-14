@@ -166,3 +166,19 @@ df_topiramate <- impute_missing_se(
 # save dataset 
 saveRDS(df_topiramate, file = "Data/df_topiramate.RDS")
 
+
+names(df_topiramate)
+
+
+# Have a look at the I^2? 
+library(metafor)
+OR1 <- rma(log_OR1, sei = se_OR1, method = "REML", data = df_topiramate)
+OR1$I2
+RR1 <- rma(log_RR1, sei = se_RR1, method = "REML", data = df_topiramate)
+RR1$I2
+
+
+OR2 <- rma(log_OR2, sei = se_OR2, method = "REML", data = df_topiramate)
+OR2$I2
+RR2 <- rma(log_RR2, sei = se_RR2, method = "REML", data = df_topiramate)
+RR2$I2
