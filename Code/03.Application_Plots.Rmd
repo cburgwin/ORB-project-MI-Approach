@@ -8,7 +8,7 @@ output: html_document
 knitr::opts_chunk$set(echo = FALSE)
 knitr::opts_knit$set(root.dir = "..")   # paths relative to the repository root, as in 01 and 02
 
-# load libaries
+# load libraries
 library(dplyr)
 library(tidyr)
 library(tidyverse)
@@ -16,6 +16,7 @@ library(ggplot2)
 library(MASS)
 library(Matrix)
 library(metafor)
+library(stringr)
 ```
 
 # Plot Univariate for seizure reduction
@@ -31,8 +32,10 @@ final_uni_df_O1 <- final_uni_df_O1 %>%
 # plot the different z-scores for unadjusted and adjusted estimates
 ggplot(data = final_uni_df_O1, aes(x = as.numeric(Selection))) +
   # Add ribbons for confidence intervals
-  geom_ribbon(aes(ymin = CI_adjusted_lower, ymax = CI_adjusted_upper, fill = "Adjusted CI"), alpha = 0.2) +
-  geom_ribbon(aes(ymin = CI_unadjusted_lower, ymax = CI_unadjusted_upper, fill = "Unadjusted CI"), alpha = 0.1) +
+  geom_ribbon(aes(ymin = CI_adjusted_lower, ymax = CI_adjusted_upper, 
+                  fill = "Adjusted CI"), alpha = 0.2) +
+  geom_ribbon(aes(ymin = CI_unadjusted_lower, ymax = CI_unadjusted_upper, 
+                  fill = "Unadjusted CI"), alpha = 0.1) +
   # Add adjusted estimate line and point
   geom_line(aes(y = Estimate_adjusted, color = "Adjusted Estimate"), linewidth = 1) +
   geom_point(aes(y = Estimate_adjusted, color = "Adjusted Estimate"), size = 2) +
@@ -41,8 +44,10 @@ ggplot(data = final_uni_df_O1, aes(x = as.numeric(Selection))) +
             linetype = "dashed", linewidth = 1) +
   # Facet by z_score and effect_estimate
   facet_grid(Z_score ~ Measure,
-             labeller = labeller(Measure = c("log OR" = "Effect Estimate: Odds Ratio (OR)",
-                                                     "log RR" = "Effect Estimate: Relative Risk (RR)"),
+             labeller = labeller(Measure = c("log OR" = "Effect Estimate: Odds Ratio
+                                             (OR)",
+                                             "log RR" = "Effect Estimate: Relative Risk
+                                             (RR)"),
                                  Z_score = c("TRUE" = "Selection on Z-score",
                                              "FALSE" = "Selection on log OR/log RR"))) +
   # Define scales for colors and fill
@@ -78,8 +83,10 @@ final_uni_df_O2 <- final_uni_df_O2 %>%
 # plot the different z-scores for unadjusted and adjusted estimates
 ggplot(data = final_uni_df_O2, aes(x = as.numeric(Selection))) +
   # Add ribbons for confidence intervals
-  geom_ribbon(aes(ymin = CI_adjusted_lower, ymax = CI_adjusted_upper, fill = "Adjusted CI"), alpha = 0.2) +
-  geom_ribbon(aes(ymin = CI_unadjusted_lower, ymax = CI_unadjusted_upper, fill = "Unadjusted CI"), alpha = 0.1) +
+  geom_ribbon(aes(ymin = CI_adjusted_lower, ymax = CI_adjusted_upper, 
+                  fill = "Adjusted CI"), alpha = 0.2) +
+  geom_ribbon(aes(ymin = CI_unadjusted_lower, ymax = CI_unadjusted_upper, 
+                  fill = "Unadjusted CI"), alpha = 0.1) +
   # Add adjusted estimate line and point
   geom_line(aes(y = Estimate_adjusted, color = "Adjusted Estimate"), linewidth = 1) +
   geom_point(aes(y = Estimate_adjusted, color = "Adjusted Estimate"), size = 2) +
@@ -88,8 +95,10 @@ ggplot(data = final_uni_df_O2, aes(x = as.numeric(Selection))) +
             linetype = "dashed", linewidth = 1) +
   # Facet by z_score and effect_estimate
   facet_grid(Z_score ~ Measure,
-             labeller = labeller(Measure = c("log OR" = "Effect Estimate: Odds Ratio (OR)",
-                                                     "log RR" = "Effect Estimate: Relative Risk (RR)"),
+             labeller = labeller(Measure = c("log OR" = "Effect Estimate: Odds Ratio
+                                             (OR)",
+                                             "log RR" = "Effect Estimate: Relative Risk
+                                             (RR)"),
                                  Z_score = c("TRUE" = "Selection on Z-score",
                                              "FALSE" = "Selection on log OR/log RR"))) +
   # Define scales for colors and fill
@@ -149,9 +158,10 @@ final_biv_df_O1$Correlation[final_biv_df_O1$Correlation == "studyspecific"] <- "
 final_biv_df_O1$Correlation[final_biv_df_O1$Correlation == "estimated"] <- "Global"
 
 # factor correlation such that it is depicted in the correct order in the legend
-final_biv_df_O1$Correlation <- factor(
-  final_biv_df_O1$Correlation, 
-  levels = c("-0.9", "-0.6", "-0.3", "0", "0.3", "0.6", "0.67", "Global", "Study-specific"))
+final_biv_df_O1$Correlation <- factor(final_biv_df_O1$Correlation, 
+                                      levels = c("-0.9", "-0.6", "-0.3", "0", "0.3",
+                                                 "0.6", "0.67", "Global",
+                                                 "Study-specific"))
 
 # plot correlation over different colors
 ggplot(data = final_biv_df_O1, aes(x = as.numeric(Selection))) +
@@ -162,15 +172,18 @@ ggplot(data = final_biv_df_O1, aes(x = as.numeric(Selection))) +
             shape = Correlation), size = 2) +
     # Facets
    facet_grid(Z_score ~ Measure,
-              labeller = labeller(Measure = c("log OR" = "Effect Estimate: Odds Ratio (OR)",
-                                              "log RR" = "Effect Estimate: Relative Risk (RR)"),
+              labeller = labeller(Measure = c("log OR" = "Effect Estimate: Odds Ratio
+                                              (OR)",
+                                              "log RR" = "Effect Estimate: Relative Risk
+                                              (RR)"),
                                   Z_score = c("TRUE" = "Selection on Z-score",
                                               "FALSE" = "Selection on log OR/log RR"))) +
      # Manual scales
     scale_color_manual(name = "Correlation",
                       values = c("-0.9" = "lightblue", "-0.6" = "#92C5DE",
                                  "-0.3" = "#4393C3", "0" = "cornflowerblue",
-                                 "0.3" = "#2166AC", "0.6" = "skyblue4", "0.67" = "#03045E",
+                                 "0.3" = "#2166AC", "0.6" = "skyblue4",
+                                 "0.67" = "#03045E",
                                  "Study-specific" = "red", "Global" = "forestgreen")) +
     scale_shape_manual(name = "Correlation",
                       values = c("-0.9" = 16, "-0.6" = 17, "-0.3" = 18,
@@ -189,7 +202,6 @@ ggplot(data = final_biv_df_O1, aes(x = as.numeric(Selection))) +
          strip.text = element_text(size = 16)) 
 
 ggsave("Plots_Paper/App_Corr_12_mv_REM_O1.png", width = 10, height = 10)
-
 ```
 
 ## for Seizure Freedom
@@ -226,9 +238,9 @@ final_biv_df$Correlation[final_biv_df$Correlation == "studyspecific"] <- "Study-
 final_biv_df$Correlation[final_biv_df$Correlation == "estimated"] <- "Global"
 
 # factor correlation such that it is depicted in the correct order in the legend
-final_biv_df$Correlation <- factor(
-  final_biv_df$Correlation, 
-  levels = c("-0.9", "-0.6", "-0.3", "0", "0.3", "0.6", "0.67", "Global", "Study-specific"))
+final_biv_df$Correlation <- factor(final_biv_df$Correlation, 
+                                   levels = c("-0.9", "-0.6", "-0.3", "0", "0.3", "0.6",
+                                              "0.67", "Global", "Study-specific"))
 
 
 # plot correlation over different colors
@@ -240,15 +252,18 @@ ggplot(data = final_biv_df, aes(x = as.numeric(Selection))) +
             shape = Correlation), size = 2) +
     # Facets
    facet_grid(Z_score ~ Measure,
-              labeller = labeller(Measure = c("log OR" = "Effect Estimate: Odds Ratio (OR)",
-                                              "log RR" = "Effect Estimate: Relative Risk (RR)"),
+              labeller = labeller(Measure = c("log OR" = "Effect Estimate: Odds Ratio
+                                              (OR)",
+                                              "log RR" = "Effect Estimate: Relative Risk
+                                              (RR)"),
                                   Z_score = c("TRUE" = "Selection on Z-score",
                                               "FALSE" = "Selection on log OR/log RR"))) +
      # Manual scales
      scale_color_manual(name = "Correlation",
                       values = c("-0.9" = "lightblue", "-0.6" = "#92C5DE",
                                  "-0.3" = "#4393C3", "0" = "cornflowerblue",
-                                 "0.3" = "#2166AC", "0.6" = "skyblue4", "0.67" = "#03045E",
+                                 "0.3" = "#2166AC", "0.6" = "skyblue4",
+                                 "0.67" = "#03045E",
                                  "Study-specific" = "red", "Global" = "forestgreen")) +
      scale_shape_manual(name = "Correlation",
                       values = c("-0.9" = 16, "-0.6" = 17, "-0.3" = 18,
@@ -302,24 +317,32 @@ plotdf <- plotdf %>%
                   Estimate_adjusted_uni, Estimate_unadjusted_uni,
                   CI_adjusted_low_uni, CI_adjusted_up_uni), as.numeric))
 
-
 # Create the ggplot
 ggplot(data = plotdf, aes(x = as.numeric(Selection))) +
   # Add ribbons for confidence intervals
   geom_ribbon(aes(ymin = as.numeric(CI_adjusted_low_uni), ymax = as.numeric(CI_adjusted_up_uni), fill = "Adjusted CI Univariate"), alpha = 0.2) +
-  geom_ribbon(aes(ymin = CI_adjusted_lower, ymax = CI_adjusted_upper, fill = "Adjusted CI Bivariate"), alpha = 0.1) +
+  geom_ribbon(aes(ymin = CI_adjusted_lower, ymax = CI_adjusted_upper,
+                  fill = "Adjusted CI Bivariate"), alpha = 0.1) +
   # Add adjusted estimate line and point
-  geom_line(aes(y = as.numeric(Estimate_adjusted), color = "Adjusted - Bivariate"), linewidth = 1) +
-  geom_line(aes(y = as.numeric(Estimate_adjusted_uni), color = "Adjusted - Univariate"), linewidth = 1) +
-  geom_point(aes(y = as.numeric(Estimate_adjusted), color = "Adjusted - Bivariate"), size = 2) +
-  geom_point(aes(y = as.numeric(Estimate_adjusted_uni), color = "Adjusted - Univariate"), size = 2) +
+  geom_line(aes(y = as.numeric(Estimate_adjusted), 
+                color = "Adjusted - Bivariate"), linewidth = 1) +
+  geom_line(aes(y = as.numeric(Estimate_adjusted_uni), 
+                color = "Adjusted - Univariate"), linewidth = 1) +
+  geom_point(aes(y = as.numeric(Estimate_adjusted), 
+                 color = "Adjusted - Bivariate"), size = 2) +
+  geom_point(aes(y = as.numeric(Estimate_adjusted_uni), 
+                 color = "Adjusted - Univariate"), size = 2) +
   # Add unadjusted estimate line
-  geom_line(aes(y = as.numeric(Estimate_unadjusted), color = "Naive - Bivariate"), linetype = "dashed", linewidth = 1) +
-  geom_line(aes(y = as.numeric(Estimate_unadjusted_uni), color = "Naive - Univariate"), linetype = "dashed", linewidth = 1) +
+  geom_line(aes(y = as.numeric(Estimate_unadjusted), color = "Naive - Bivariate"), 
+            linetype = "dashed", linewidth = 1) +
+  geom_line(aes(y = as.numeric(Estimate_unadjusted_uni), color = "Naive - Univariate"), 
+            linetype = "dashed", linewidth = 1) +
   # Facet by z_score and effect_estimate
   facet_grid(Z_score ~ Measure,
-             labeller = labeller(Measure = c("log OR" = "Effect Estimate: Odds Ratio (OR)",
-                                             "log RR" = "Effect Estimate: Relative Risk (RR)"),
+             labeller = labeller(Measure = c("log OR" = "Effect Estimate: Odds Ratio
+                                             (OR)",
+                                             "log RR" = "Effect Estimate: Relative Risk
+                                             (RR)"),
                                  Z_score = c("TRUE" = "Selection on Z-score",
                                              "FALSE" = "Selection on log OR/log RR"))) +
   # Define scales for colors and fill
@@ -351,14 +374,13 @@ ggsave("Plots_Paper/Uni_Multi_Comp_12_REM_01.png", width = 10, height = 10)
 ## within-study correlation of -0.3
 
 ```{r, fig.width = 10, fig.height = 10}
-
-#data set for univariate
+# data set for univariate
 uni <- final_uni_df_O2 %>%
   dplyr::select(Z_score, Selection, Measure,
-                Estimate_adjusted_uni = Estimate_adjusted,
+                Estimate_adjusted_uni   = Estimate_adjusted,
                 Estimate_unadjusted_uni = Estimate_unadjusted,
-                CI_adjusted_low_uni = CI_adjusted_lower,
-                CI_adjusted_up_uni = CI_adjusted_upper)
+                CI_adjusted_low_uni     = CI_adjusted_lower,
+                CI_adjusted_up_uni      = CI_adjusted_upper)
 
 uni$Selection <- as.numeric(uni$Selection)
 final_biv_df$Selection <- as.numeric(final_biv_df$Selection)
@@ -384,20 +406,31 @@ plotdf <- plotdf %>%
 # Create the ggplot
 ggplot(data = plotdf, aes(x = as.numeric(Selection))) +
   # Add ribbons for confidence intervals
-  geom_ribbon(aes(ymin = as.numeric(CI_adjusted_low_uni), ymax = as.numeric(CI_adjusted_up_uni), fill = "Adjusted CI Univariate"), alpha = 0.2) +
-  geom_ribbon(aes(ymin = CI_adjusted_lower, ymax = CI_adjusted_upper, fill = "Adjusted CI Bivariate"), alpha = 0.1) +
+  geom_ribbon(aes(ymin = as.numeric(CI_adjusted_low_uni),
+                  ymax = as.numeric(CI_adjusted_up_uni), 
+                  fill = "Adjusted CI Univariate"), alpha = 0.2) +
+  geom_ribbon(aes(ymin = CI_adjusted_lower, ymax = CI_adjusted_upper, 
+                  fill = "Adjusted CI Bivariate"), alpha = 0.1) +
   # Add adjusted estimate line and point
-  geom_line(aes(y = as.numeric(Estimate_adjusted), color = "Adjusted - Bivariate"), linewidth = 1) +
-  geom_line(aes(y = as.numeric(Estimate_adjusted_uni), color = "Adjusted - Univariate"), linewidth = 1) +
-  geom_point(aes(y = as.numeric(Estimate_adjusted), color = "Adjusted - Bivariate"), size = 2) +
-  geom_point(aes(y = as.numeric(Estimate_adjusted_uni), color = "Adjusted - Univariate"), size = 2) +
+  geom_line(aes(y = as.numeric(Estimate_adjusted), color = "Adjusted - Bivariate"), 
+            linewidth = 1) +
+  geom_line(aes(y = as.numeric(Estimate_adjusted_uni), color = "Adjusted - Univariate"), 
+            linewidth = 1) +
+  geom_point(aes(y = as.numeric(Estimate_adjusted), color = "Adjusted - Bivariate"), 
+             size = 2) +
+  geom_point(aes(y = as.numeric(Estimate_adjusted_uni), color = "Adjusted - Univariate"),
+             size = 2) +
   # Add unadjusted estimate line
-  geom_line(aes(y = as.numeric(Estimate_unadjusted), color = "Naive - Bivariate"), linetype = "dashed", linewidth = 1) +
-  geom_line(aes(y = as.numeric(Estimate_unadjusted_uni), color = "Naive - Univariate"), linetype = "dashed", linewidth = 1) +
+  geom_line(aes(y = as.numeric(Estimate_unadjusted), color = "Naive - Bivariate"),
+            linetype = "dashed", linewidth = 1) +
+  geom_line(aes(y = as.numeric(Estimate_unadjusted_uni), color = "Naive - Univariate"),
+            linetype = "dashed", linewidth = 1) +
   # Facet by z_score and effect_estimate
   facet_grid(Z_score ~ Measure,
-             labeller = labeller(Measure = c("log OR" = "Effect Estimate: Odds Ratio (OR)",
-                                             "log RR" = "Effect Estimate: Relative Risk (RR)"),
+             labeller = labeller(Measure = c("log OR" = "Effect Estimate: Odds Ratio 
+                                             (OR)",
+                                             "log RR" = "Effect Estimate: Relative Risk 
+                                             (RR)"),
                                  Z_score = c("TRUE" = "Selection on Z-score",
                                              "FALSE" = "Selection on log OR/log RR"))) +
   # Define scales for colors and fill
@@ -424,7 +457,7 @@ ggplot(data = plotdf, aes(x = as.numeric(Selection))) +
 ggsave("Plots_Paper/Uni_Multi_Comp_12_REM.png", width = 10, height = 10)
 ```
 
-# Create forest plot for comparison of our approaches
+# Forest plot for comparison of univariate to bivariate approach
 
 ```{r, warning = FALSE}
 # read data in from Table_2.rds
@@ -433,43 +466,31 @@ data <- readRDS("Data/Table_2.rds")
 # transform data to plot them as forest plot
 dat <- data %>%
   # Standardize Approach names 
-  mutate(
-    Approach = case_when(
-      Approach == "Selection on effect" ~ "Selection on effect estimate",
-      Approach == "Selection on zscore" ~ "Selection on z-score",
-      Approach == "Bivariate Selection on effect" ~ "Selection on effect estimate",
-      Approach == "Bivariate Selection on zscore" ~ "Selection on z-score",
-      TRUE ~ Approach
-    ),
-    #  Re-format the Model column
-    Model = if_else(Correlation == "Univariate", "Univariate", paste0("Bivariate (", Correlation, ")")),
-    # Clean up the Measure column
-    Effect = str_remove(Measure, "log ")
-  ) %>%
+  mutate(Approach = case_when(
+         Approach == "Selection on effect" ~ "Selection on effect estimate",
+         Approach == "Selection on zscore" ~ "Selection on z-score",
+         Approach == "Bivariate Selection on effect" ~ "Selection on effect estimate",
+         Approach == "Bivariate Selection on zscore" ~ "Selection on z-score",
+         TRUE ~ Approach),
+        #  Re-format the Model column
+        Model = if_else(Correlation == "Univariate", "Univariate", 
+                        paste0("Bivariate (", Correlation, ")")),
+        # Clean up the Measure column
+        Effect = str_remove(Measure, "log ")) %>%
   # Pivot the two outcomes into a long format
-  pivot_longer(
-    cols = starts_with("Outcome"),
-    names_to = c("Outcome", ".value"),
-    names_pattern = "Outcome (\\d+)_(.*)"
-  ) %>%
+  pivot_longer(cols = starts_with("Outcome"),
+               names_to = c("Outcome", ".value"),
+               names_pattern = "Outcome (\\d+)_(.*)") %>%
   #  Rename outcome numbers to your descriptive labels
-  mutate(
-    Outcome = if_else(Outcome == "1", "50% Seizure Reduction", "Seizure Freedom")
-  ) %>%
-  mutate(est = str_remove(Est_SE, " \\(.*\\)"
-                          )) %>%
+  mutate(Outcome = if_else(Outcome == "1", "50% Seizure Reduction", 
+                           "Seizure Freedom")) %>%
+  mutate(est = str_remove(Est_SE, " \\(.*\\)")) %>%
   #  Separate the confidence intervals into low (lcl) and high (ucl) bounds
-  separate_wider_delim(
-    cols = CI_95, 
-    delim = " to ", 
-    names = c("lcl", "ucl")
-  ) %>%
+  separate_wider_delim(cols = CI_95, delim = " to ", names = c("lcl", "ucl")) %>%
   # Clean up data types 
-  mutate(
-    lcl = as.numeric(lcl),
-    ucl = as.numeric(ucl),
-    est = as.numeric(est)
-  ) %>%
+  mutate(lcl = as.numeric(lcl),
+         ucl = as.numeric(ucl),
+         est = as.numeric(est)) %>%
   #select/reorder the final columns
   dplyr::select(Model, Effect, Approach, Outcome, est, lcl, ucl)
 ```
@@ -478,25 +499,18 @@ dat <- data %>%
 ```{r, warning = FALSE}
 # Ordering
 dat <- dat %>%
-  mutate(
-    Model = factor(
-      Model,
-      levels = c("Univariate",
-                 "Bivariate (r = 0)",
-                 "Bivariate (r = 0.7)")),
-    Approach = factor(
-      Approach,
-      levels = c("Naive estimate",
-                 "Selection on effect estimate",
-                 "Selection on z-score"))) %>%
+  mutate(Model = factor(Model, levels = c("Univariate", "Bivariate (r = 0)",
+                                          "Bivariate (r = 0.7)")),
+         Approach = factor(Approach, levels = c("Naive estimate",
+                                           "Selection on effect estimate",
+                                           "Selection on z-score"))) %>%
   arrange(Model, Approach)
 
 # create the label for ploting
-dat$Label <- factor(
-  dat$Approach,
-  levels = rev(c("Naive estimate",
-                 "Selection on effect estimate",
-                 "Selection on z-score")))
+dat$Label <- factor(dat$Approach,
+                    levels = rev(c("Naive estimate",
+                                   "Selection on effect estimate",
+                                   "Selection on z-score")))
 
 dat$Label <- factor(dat$Label,
                    levels = rev(unique(dat$Label)))
@@ -509,8 +523,7 @@ dat$Label <- factor(dat$Label,
 pd <- position_dodge(width = 0.6, 
                      reverse = TRUE)
 
-ggplot(dat,
-       aes(x = est, y = Label, xmin = lcl, xmax = ucl, colour = Model)) +
+ggplot(dat, aes(x = est, y = Label, xmin = lcl, xmax = ucl, colour = Model)) +
   geom_vline(xintercept = 0, linetype = 2, colour = "grey40") +
   geom_errorbarh(width = 0.15, linewidth = 0.7, position = pd) +
   geom_point(size = 3, position = pd) +
@@ -520,9 +533,7 @@ ggplot(dat,
   scale_colour_discrete(labels = c("Univariate",
                                    expression("Bivariate ("*rho[W]*" = 0)"),
                                    expression("Bivariate ("*rho[W]*" = 0.7)"))) +
-  labs(x = "Log (OR)/ Log (RR)",
-       y = NULL,
-       colour = "Imputation model") +
+  labs(x = "Log (OR)/ Log (RR)", y = NULL, colour = "Imputation model") +
   theme_bw(base_size = 16) +
   theme(legend.position = "bottom",
         legend.text = element_text(size = 16),
@@ -533,12 +544,11 @@ ggplot(dat,
         strip.text = element_text(face = "bold"),
         axis.text.y = element_text(size = 16, colour = "black"))
 
-
 ggsave("Plots_Paper/Forestplot.png", width = 10, height = 6)
 ```
 
-# Create forest plot for comparison to existing methods
-### for seizure freedom
+# Forest plot for comparison to established methods
+## for outcome seizure freedom
 
 ```{r}
 # read data in
@@ -561,29 +571,21 @@ data_topiramate <- data.frame(
   C2 = c (NA, 2, NA,  2, 1, NA, NA, 0, 0, NA, 0, NA)
 )
 
-
-
 # ORBIT classification
 orbit_to_risk <- c(A = "HR", D = "HR", E = "HR", G = "HR",   # High Risk
                    C = "LR", F = "LR", H = "LR",             # Low Risk
                    B = "NR", I = "NR")                       # No Risk
 
 # Seizure Reduction (outcome 1) — from Table 3 Copas et al. 2019
-orbit_code_outcome1 <- c(
-  "Coles"        = "E"
-  # remaining studies fully report seizure reduction -> not in this vector
-)
+orbit_code_outcome1 <- c("Coles"        = "E")
 
 # Seizure freedom (outcome 2) — from Table 3 Copas et al. 2019
-orbit_code_outcome2 <- c(
-  "Ben-Menachem" = "E",
-  "Faught"       = "E",
-  "Privitera"    = "E",
-  "Rosenfeld"    = "C",
-  "Yen"          = "E",
-   "Coles"  = "E"
-  # remaining studies fully report seizure freedom -> not in this vector
-)
+orbit_code_outcome2 <- c("Ben-Menachem" = "E",
+                         "Faught"       = "E",
+                         "Privitera"    = "E",
+                         "Rosenfeld"    = "C",
+                         "Yen"          = "E",
+                         "Coles"  = "E")
 
 data_topiramate$orbit_out1 <- orbit_to_risk[orbit_code_outcome1[data_topiramate$Author]]
 data_topiramate$orbit_out2 <- orbit_to_risk[orbit_code_outcome2[data_topiramate$Author]]
@@ -592,10 +594,8 @@ data_topiramate$orbit_out2 <- orbit_to_risk[orbit_code_outcome2[data_topiramate$
 
 ```{r}
 compute_effects <- function(data) {
-   # --------------------------------------
   # OUTCOME 1: Seizure Reduction
-  # --------------------------------------
-  
+
    # Log Relative Risk
   data <- escalc(measure = "RR", 
                  ai = T1, 
@@ -610,10 +610,8 @@ compute_effects <- function(data) {
   # Convert variance to SE
   data$se_RR1 <- sqrt(data$var_RR1)
   
-  # --------------------------------------
   # OUTCOME 2: Seizure Freedom
-  # --------------------------------------
-  
+
   # Log Relative Risk
   data <- escalc(measure = "RR", 
                  ai = T2, 
@@ -669,23 +667,18 @@ impute_missing_se <- function(data,
   return(data)
 }
 
-data_topiramate <- impute_missing_se(
-  data = data_topiramate, 
-  target_theta_col = "log_RR1", 
-  target_se_col = "se_RR1"
-)
+data_topiramate <- impute_missing_se(data = data_topiramate, 
+                                     target_theta_col = "log_RR1", 
+                                     target_se_col = "se_RR1")
 
-data_topiramate <- impute_missing_se(
-  data = data_topiramate, 
-  target_theta_col = "log_RR2", 
-  target_se_col = "se_RR2"
-)
+data_topiramate <- impute_missing_se(data = data_topiramate, 
+                                     target_theta_col = "log_RR2", 
+                                     target_se_col = "se_RR2")
 ```
 
 ```{r}
-# -------------------------------------------------------------------
-# Copas ORB Selection Model for Benefit Outcomes (Copas et al.)
-# -------------------------------------------------------------------
+# Copas ORB Selection Model for Benefit Outcomes (Copas et al. 2019)
+
 copas_orb_adjustment <- function(data, 
                                  theta_col = "log_RR2", 
                                  se_col    = "se_RR2", 
@@ -737,20 +730,17 @@ copas_orb_adjustment <- function(data,
   
   p_val <- 1 - pchisq(pmax(0, 2 * (max_ll - log_lik_B(0))), df = 1)
   
-  return(data.frame(
-    estimate_logRR = theta_B,
-    ci_lower_logRR = ci_lower,
-    ci_upper_logRR = ci_upper,
-    estimate_RR    = exp(theta_B),
-    ci_lower_RR    = exp(ci_lower),
-    ci_upper_RR    = exp(ci_upper),
-    p_value        = p_val
-  ))
+  return(data.frame(estimate_logRR = theta_B,
+                    ci_lower_logRR = ci_lower,
+                    ci_upper_logRR = ci_upper,
+                    estimate_RR    = exp(theta_B),
+                    ci_lower_RR    = exp(ci_lower),
+                    ci_upper_RR    = exp(ci_upper),
+                    p_value        = p_val))
 }
 
 copas_result <- copas_orb_adjustment(data_topiramate)
 ```
-
 
 
 
@@ -776,7 +766,7 @@ data_topiramate_unrep <- data.frame(
 )
 
 
-# function from github
+# Function from Saracini's Github
 #The function reORBadj adjusts for ORB according to the selection model framework developed in this project
 #It can be seen as an extension of the Copas et al. (2019) methodology, for the random effects model, and without
 #the need for an ORBIT classification of unreported study outcomes.
@@ -831,7 +821,6 @@ data_topiramate_unrep <- data.frame(
 #LR_tau_squared_adjusted_up = upper bound of PL CI for ORB-adjusted estimate of heterogeneity variance
 #average_sigma_squared_unadjusted = average of imputed and reported variances with naive estimation
 #sigma_squared_average_adjusted = average of imputed and reported variances with ORB-adjusted estimation
-
 
 reORBadj <- function(a=NULL, 
                      c=NULL,
@@ -1639,47 +1628,38 @@ resultCC2_SeizureFree <- reORBadj(a = data_topiramate_unrep$T2,
 ```
 
 ```{r}
-source("Code/00.Functions.R")
+source("../Code/00.Functions.R")
 o <- 2
 deltas <- c(0, 0.5, 1.3)
 measures <- c("RR")
 m_imputations <- 1000
 
-#Loop 0: iterate over the two outcomes
-res_uni_plot <- list()   # reset per outcome, otherwise the O2 file also contains the O1 rows
-  # Loop 1: Iterate over measures first and impute once per measure
+# Loop 0: iterate over the two outcomes
+res_uni_plot <- list() # reset per outcome, otherwise the O2 file also contains the O1 rows
+  # Iterate over measures first and impute once per measure
   for (m in measures) {
     
     theta_cols <- paste0("log_", m, o)
     se_cols <- paste0("se_", m, o)
     
-    #cat(sprintf("Generating imputed data for Measure = %s\n", m))
-    
     # Run imputation ONCE here. The random pool is now locked in.
-    mi <- run_univariate_imputation(
-      data = data_topiramate,
-      theta_col = theta_cols,
-      se_col = se_cols,
-      m = m_imputations
-    )
+    mi <- run_univariate_imputation(data = data_topiramate,
+                                    theta_col = theta_cols,
+                                    se_col = se_cols,
+                                    m = m_imputations)
     
     # Extract the static Naive estimate for this measure
-    naive_df <- data.frame(
-      Approach = "Naive estimate",
-      Estimate = as.numeric(mi$res_naive$beta),
-      SE       = mi$res_naive$se,
-      CI_Lower = mi$res_naive$ci.lb,
-      CI_Upper = mi$res_naive$ci.ub
-    )
+    naive_df <- data.frame(Approach = "Naive estimate",
+                           Estimate = as.numeric(mi$res_naive$beta),
+                           SE       = mi$res_naive$se,
+                           CI_Lower = mi$res_naive$ci.lb,
+                           CI_Upper = mi$res_naive$ci.ub)
     
     # refit the imputed datasets once, reused for every delta and selection type
     fits_uni <- fit_imputations_uni(mi)
-   # failed_refits[paste0("Plot uni ", m, " O", o)] <- attr(fits_uni, "failed.proportion")
     
-    # Loop 2: Now test different deltas using the same imputed data
+    # apply different deltas using the same imputed data
     for (delta in deltas) {
-      
-      #cat(sprintf("  -> Calculating adjustments for delta = %s\n", delta))
       
       # Importance sampling calculations over the static 'mi' object
       adj_eff <- adj_univariate(mi,
@@ -1699,7 +1679,7 @@ res_uni_plot <- list()   # reset per outcome, otherwise the O2 file also contain
       
       # Add metadata
       tmp$Measure   <- paste0("log ", m)
-      tmp$Selection <- delta  # Saved as numeric directly to avoid your earlier character bug!
+      tmp$Selection <- delta  # Saved as numeric directly 
       
       # Append to list
       res_uni_plot[[length(res_uni_plot) + 1]] <- tmp
@@ -1709,37 +1689,36 @@ res_uni_plot <- list()   # reset per outcome, otherwise the O2 file also contain
  plot_uni_df <- do.call(rbind,
                         res_uni_plot)
   
-  # bring data into wide format
- naive_df <- plot_uni_df %>%
-    filter(Approach == "Naive estimate") %>%
-    dplyr::select(Selection,
-                  Estimate_unadjusted = Estimate,
-                  CI_unadjusted_lower = CI_Lower,
-                  CI_unadjusted_upper = CI_Upper)
+# bring data into wide format
+naive_df <- plot_uni_df %>%
+  filter(Approach == "Naive estimate") %>%
+  dplyr::select(Selection,
+                Estimate_unadjusted = Estimate,
+                CI_unadjusted_lower = CI_Lower,
+                CI_unadjusted_upper = CI_Upper)
   
-  adjusted_df <- plot_uni_df %>%
-    filter(Approach != "Naive estimate") %>%
-    # Create the Z_score column your plot expects (TRUE if zscore, FALSE if effect)
-    mutate(Z_score = ifelse(Approach == "Selection on zscore", TRUE, FALSE)) %>%
-    dplyr::select(Selection, Z_score,
-                  estimate_logRR = Estimate,
-                  ci_lower_logRR = CI_Lower,
-                  ci_upper_logRR = CI_Upper)
+adjusted_df <- plot_uni_df %>%
+  filter(Approach != "Naive estimate") %>%
+  # Create the Z_score column your plot expects (TRUE if zscore, FALSE if effect)
+  mutate(Z_score = ifelse(Approach == "Selection on zscore", TRUE, FALSE)) %>%
+  dplyr::select(Selection, Z_score,
+                estimate_logRR = Estimate,
+                ci_lower_logRR = CI_Lower,
+                ci_upper_logRR = CI_Upper)
   
 final_uni_df <- adjusted_df %>%
     left_join(naive_df, by = c("Selection"))
-  
+
+# save naive univariate estimate  
 df_naive_uni <- naive_df %>%
   slice(1) %>%
-  transmute(
-    Model      = "Naive Univariate Estimate",
-    logRR      = Estimate_unadjusted,
-    CI_low_log = CI_unadjusted_lower,
-    CI_up_log  = CI_unadjusted_upper,
-    RR         = exp(logRR),
-    CI_low_RR  = exp(CI_low_log),
-    CI_up_RR   = exp(CI_up_log)
-  )
+  transmute(Model      = "Naive Univariate Estimate",
+            logRR      = Estimate_unadjusted,
+            CI_low_log = CI_unadjusted_lower,
+            CI_up_log  = CI_unadjusted_upper,
+            RR         = exp(logRR),
+            CI_low_RR  = exp(CI_low_log),
+            CI_up_RR   = exp(CI_up_log))
 ```
 
 ```{r}
@@ -1756,37 +1735,28 @@ for (rho in rhos) {
   #loop over the two measures (here we dont loop for the outcomes since they are processed together)
   for (m in measures) {
     
-   # cat(sprintf("\n--- Running Bivariate Imputation Pool: Measure = %s, correlation setting = %s ---\n", m, rho))
-    
     theta_cols <- paste0("log_", m, c(1, 2))
     se_cols <- paste0("se_", m, c(1, 2))
     
     # Run imputation
-    mi_biv <- run_bivariate_imputation(
-      data = data_topiramate, 
-      theta_cols = theta_cols, 
-      se_cols = se_cols, 
-      rho_w = rho, 
-      m = m_imputations
-    )
+    mi_biv <- run_bivariate_imputation(data = data_topiramate, 
+                                       theta_cols = theta_cols, 
+                                       se_cols = se_cols, 
+                                       rho_w = rho, 
+                                       m = m_imputations)
     
     # create naive df similar to the one produced by adj_bivariate
-    naive_df <- data.frame(
-      Outcome   = c("O1", "O2"),
-      Approach  = "Naive estimate",
-      Estimate  = as.numeric(mi_biv$res_naive$beta),
-      SE        = sqrt(diag(mi_biv$res_naive$vb)),
-      CI_Lower  = mi_biv$res_naive$ci.lb,
-      CI_Upper  = mi_biv$res_naive$ci.ub
-    )
+    naive_df <- data.frame(Outcome   = c("O1", "O2"),
+                           Approach  = "Naive estimate",
+                           Estimate  = as.numeric(mi_biv$res_naive$beta),
+                           SE        = sqrt(diag(mi_biv$res_naive$vb)),
+                           CI_Lower  = mi_biv$res_naive$ci.lb,
+                           CI_Upper  = mi_biv$res_naive$ci.ub)
     
     # refit the imputed datasets once, reused for every delta and selection type
     fits_biv <- fit_imputations_biv(mi_biv)
-    #failed_refits[paste0("Plot biv ", m, " rho_w=", rho)] <- mean(sapply(fits_biv, is.null))
-    
+
     for(delta in deltas) {
-      
-     # cat(sprintf("  -> Calculating Bivariate Adjustments for delta = %s\n", delta))
       
       # Calculate both Adjustments (each return a 2-row dataframe for O1 and O2)
       adj_eff <- adj_bivariate(mi_biv, 
@@ -1830,9 +1800,7 @@ naive_part <- plot_biv_df %>%
   
 plot_biv_df <- plot_biv_df %>%
     filter(Approach != "Naive estimate") %>%
-    mutate(
-      Z_score = (Approach == "Bivariate Selection on zscore")
-    ) %>%
+    mutate(Z_score = (Approach == "Bivariate Selection on zscore")) %>%
     dplyr::select(Outcome, Measure, Selection, Z_score, Correlation,
            Estimate_adjusted = Estimate, 
            SE_adjusted       = SE,
@@ -1846,15 +1814,13 @@ plot_biv_df <- plot_biv_df %>%
 df_naive_biv <- naive_part %>%
   filter(Outcome == "O2") %>%
   slice(1) %>%
-  transmute(
-    Model      = "Naive Bivariate Estimate",
-    logRR      = Estimate_unadjusted,
-    CI_low_log = CI_unadjusted_lower,
-    CI_up_log  = CI_unadjusted_upper,
-    RR         = exp(logRR),
-    CI_low_RR  = exp(CI_low_log),
-    CI_up_RR   = exp(CI_up_log)
-  )
+  transmute(Model      = "Naive Bivariate Estimate",
+            logRR      = Estimate_unadjusted,
+            CI_low_log = CI_unadjusted_lower,
+            CI_up_log  = CI_unadjusted_upper,
+            RR         = exp(logRR),
+            CI_low_RR  = exp(CI_low_log),
+            CI_up_RR   = exp(CI_up_log))
 ```
 
 ```{r}
@@ -1919,7 +1885,7 @@ fit_kirkham_bivariate <- function(data,
   df_obs <- df_obs %>%
     arrange(Study_id, outcome)
   # Fit bivariate random-effects meta-analysis
-  # This is the Kirkham multivariate approach:information from O1 contributes to 
+  # This is the Kirkham multivariate approach: information from O1 contributes to 
   # estimation of O2 through the within-study and between-study correlations.
   fit <- metafor::rma.mv(yi = yi,
                          V = V,
@@ -1929,7 +1895,7 @@ fit_kirkham_bivariate <- function(data,
                          data = df_obs,
                          method = method,
                          control = list(rel.tol = 1e-8, maxiter = 1000))
-  # 7. Extract pooled estimates
+  # Extract pooled estimates
   beta <- as.numeric(coef(fit))
   se   <- fit$se
   ci_lb <- fit$ci.lb
@@ -1952,16 +1918,10 @@ complete <- data_topiramate %>%
   filter(!is.na(log_RR1),
          !is.na(log_RR2))
 
-rho_w <- cor(
-  complete$log_RR1,
-  complete$log_RR2,
-  method = "pearson"
-)
+rho_w <- cor(complete$log_RR1, complete$log_RR2, method = "pearson")
   
-kirkham_res <- fit_kirkham_bivariate(
-  data = data_topiramate,
-  rho_w = rho_w
-)
+kirkham_res <- fit_kirkham_bivariate(data = data_topiramate,
+                                     rho_w = rho_w)
 
 # Extract Outcome 2 (Seizure Freedom, which corresponds to outcomeO2)
 kirkham_fit <- kirkham_res$fit
@@ -1970,58 +1930,54 @@ kirkham_fit <- kirkham_res$fit
 idx_o2 <- which(names(coef(kirkham_fit)) == "outcomeO2")
 
 # Format Kirkham result as a 1-row data frame matching your other models
-df_kirkham <- data.frame(
-  Model      = "Kirkham et al. (2012)",
-  logRR      = as.numeric(coef(kirkham_fit)[idx_o2]),
-  CI_low_log = as.numeric(kirkham_fit$ci.lb[idx_o2]),
-  CI_up_log  = as.numeric(kirkham_fit$ci.ub[idx_o2]),
-  RR         = exp(as.numeric(coef(kirkham_fit)[idx_o2])),
-  CI_low_RR  = exp(as.numeric(kirkham_fit$ci.lb[idx_o2])),
-  CI_up_RR   = exp(as.numeric(kirkham_fit$ci.ub[idx_o2]))
-)
+df_kirkham <- data.frame(Model      = "Kirkham et al. (2012)",
+                         logRR      = as.numeric(coef(kirkham_fit)[idx_o2]),
+                         CI_low_log = as.numeric(kirkham_fit$ci.lb[idx_o2]),
+                         CI_up_log  = as.numeric(kirkham_fit$ci.ub[idx_o2]),
+                         RR         = exp(as.numeric(coef(kirkham_fit)[idx_o2])),
+                         CI_low_RR  = exp(as.numeric(kirkham_fit$ci.lb[idx_o2])),
+                         CI_up_RR   = exp(as.numeric(kirkham_fit$ci.ub[idx_o2])))
 ```
 
 
 ```{r}
 #  Format the Logistic ORB results
 df_logistic_biv <- plot_biv_df_O2 %>%
-  mutate(
-    stat_label = ifelse(Z_score == TRUE, "z", "\u03b8\u0302"),
-    Model = paste0("Biv-MI-ORB (\u03b4 = ", Selection, ", s = ", stat_label, ")"),
-    logRR = Estimate_adjusted,
-    CI_low_log = CI_adjusted_lower,
-    CI_up_log  = CI_adjusted_upper,
-    RR         = exp(logRR),
-    CI_low_RR  = exp(CI_low_log),
-    CI_up_RR   = exp(CI_up_log)
-  ) %>%
+  mutate(stat_label = ifelse(Z_score == TRUE, "z", "\u03b8\u0302"),
+         Model = paste0("Bivariate ORB-adjustment \u03b4 = ",
+                        Selection, ", s = ", stat_label, ""),
+         logRR = Estimate_adjusted,
+         CI_low_log = CI_adjusted_lower,
+         CI_up_log  = CI_adjusted_upper,
+         RR         = exp(logRR),
+         CI_low_RR  = exp(CI_low_log),
+         CI_up_RR   = exp(CI_up_log)) %>%
   dplyr::select(Model, logRR, CI_low_log, CI_up_log, RR, CI_low_RR, CI_up_RR)
 
 #  Format the Logistic ORB results
 df_logistic_formatted <- final_uni_df %>%
-  mutate(
-    stat_label = ifelse(Z_score == TRUE, "z", "\u03b8\u0302"),
-    Model = paste0("Uni-MI-ORB (\u03b4 = ", Selection, ", s = ", stat_label, ")"),
-    logRR = estimate_logRR,
-    CI_low_log = ci_lower_logRR,
-    CI_up_log  = ci_upper_logRR,
-    RR         = exp(logRR),
-    CI_low_RR  = exp(CI_low_log),
-    CI_up_RR   = exp(CI_up_log)
-  ) %>%
+  mutate(stat_label = ifelse(Z_score == TRUE, "z", "\u03b8\u0302"),
+         Model = paste0("Univariate ORB-adjustment \u03b4 = ",
+                        Selection, ", s = ", stat_label, ""),
+         logRR = estimate_logRR,
+         CI_low_log = ci_lower_logRR,
+         CI_up_log  = ci_upper_logRR,
+         RR         = exp(logRR),
+         CI_low_RR  = exp(CI_low_log),
+         CI_up_RR   = exp(CI_up_log)) %>%
   dplyr::select(Model, logRR, CI_low_log, CI_up_log, RR, CI_low_RR, CI_up_RR)
 
 #  Results list for the existing models
-results_list <- list("Copas (ORBIT Adjusted) (FE)"        = copas_result,
+results_list <- list("Copas ORBIT Adjusted (FE)"        = copas_result,
                      "Saracini: Piecewise constant"       = resultLL_SeizureFree,
                      "Saracini: Constant-Decreasing"      = resultLC_SeizureFree,
                      "Saracini: Decreasing-Constant"      = resultCL_SeizureFree,
-                     "Saracini: Piecewise Decreasing (1)" = resultCC2_SeizureFree,
-                     "Saracini: Piecewise Decreasing (2)" = resultCC1_SeizureFree)
+                     "Saracini: Piecewise Decreasing (1)" = resultCC1_SeizureFree,
+                     "Saracini: Piecewise Decreasing (2)" = resultCC2_SeizureFree)
 
 # Extraction helper
 extract_model_estimates <- function(res, name) {
-  if (name == "Copas (ORBIT Adjusted) (FE)") {
+  if (name == "Copas ORBIT Adjusted (FE)") {
     mu  <- res$estimate_logRR
     low <- res$ci_lower_logRR
     up  <- res$ci_upper_logRR
@@ -2052,59 +2008,58 @@ df_all_models <- bind_rows(df_naive_uni,
                            df_logistic_biv)
 
 # Add a category variable for grouped coloring
-df_all_models <- df_all_models |>
-  mutate(
-    Category = case_when(
-      grepl("Naive", Model) ~ "Naive",
-      grepl("Copas", Model)      ~ "Copas",
-      grepl("Saracini", Model)   ~ "Saracini & Held",
-      grepl("Uni-MI-ORB", Model)   ~ "Uni-MI-ORB",
-      grepl("Biv-MI-ORB", Model)   ~ "Biv-MI-ORB",
-      grepl("Kirkham", Model)      ~ "Kirkham",
-      TRUE                       ~ "Other"
-    ),
-    Model = factor(Model, levels = rev(unique(Model)))
-  )
+df_all_models <- df_all_models %>%
+  mutate(Category = case_when(
+          grepl("Naive", Model) ~ "Naive",
+          grepl("Copas", Model)      ~ "Copas et al.",
+          grepl("Saracini", Model)   ~ "Saracini & Held",
+          grepl("Univariate ORB-adjustment", Model)   ~ "Univariate ORB-adjustment",
+          grepl("Bivariate ORB-adjustment", Model)   ~ "Bivariate ORB-adjustment",
+          grepl("Kirkham", Model)      ~ "Kirkham et al.",
+          TRUE                       ~ "Other"),
+        Model = factor(Model, levels = rev(unique(Model))))
 ```
 
 ```{r}
-# Create label column "RR [CI_low, CI_up]"
-df_plot <- df_all_models |>
-  mutate(
-    # Format text: e.g. "3.22 [1.27, 8.65]"
-    label_text = sprintf("%.2f [%.2f, %.2f]", RR, CI_low_RR, CI_up_RR),
-    # Preserve vertical ordering
-    Model = factor(Model, levels = rev(unique(Model)))
-  )
+df_plot <- df_plot %>%
+  mutate(Category = factor(Category,
+                           levels = c("Naive", "Copas et al.", "Saracini & Held",
+                                      "Univariate ORB-adjustment", "Kirkham et al.",
+                                      "Bivariate ORB-adjustment")))
+# rename methods for plotting
+df_plot <- df_plot %>%
+  mutate(Model_short = as.character(Model) |>
+         str_remove("^(Saracini: |Univariate ORB-adjustment |Bivariate ORB-adjustment
+                    |Copas )") |>  # drop prefix that duplicates the category
+         str_replace("^Naive (\\w+) Estimate$", "\\1"),
+         Model_short = if_else(grepl("^Kirkham", Model_short), 
+                               "Multivariate Meta-analysis", Model_short),
+         Model_short = factor(Model_short, levels = rev(unique(Model_short))))
 
-# Determine maximum upper CI limit to dynamically position labels
-x_min <- min(df_plot$CI_low_log, na.rm = TRUE)
-x_max <- max(df_plot$CI_up_log, na.rm = TRUE)
-
-x_range <- x_max - x_min
-
-ggplot(df_plot, aes(x = logRR, y = Model, color = Category)) +
-  # Reference line at No Effect (RR = 1)
+ggplot(df_plot, aes(x = logRR, y = Model_short)) +
   geom_vline(xintercept = 0, linetype = "dashed", color = "gray60") +
-  # Error bars and point estimates
-  geom_errorbarh(aes(xmin = CI_low_log, xmax = CI_up_log), width = 0.25, linewidth = 0.8) +
-  geom_point(shape = 18, size = 3.5) +
-  # Logarithmic scale with margin space for the text column
-  scale_x_continuous(limits = c(x_min - 0.05 * x_range,x_max + 0.05 * x_range)) +
-  # Allow text to sit outside default clipping area if needed
+  geom_errorbarh(aes(xmin = CI_low_log, xmax = CI_up_log),
+                 width = 0.25, linewidth = 0.8) +
+  geom_point(shape = 18, size = 3.5) +   # optional: shapes instead of colors
+  facet_grid(Category ~ ., scales = "free_y", space = "free_y", switch = "y") +
+  scale_y_discrete(expand = expansion(add = 0.8)) +  # extra space within each block
+  scale_x_continuous(limits = c(x_min - 0.05 * x_range, x_max + 0.05 * x_range)) +
   coord_cartesian(clip = "off") +
-  labs(x = "Log RR", y = NULL, color = " ") +
+  labs(x = "Log RR", y = NULL) +
   theme_minimal(base_size = 12) +
-  theme(
-    panel.grid.minor = element_blank(),
-    legend.position  = "none",
-    plot.title       = element_text(face = "bold", hjust = 0),
-    axis.text.y      = element_text(face = "bold", color = "black"))
+  theme(panel.grid.minor   = element_blank(),
+        panel.grid.major.y = element_blank(),
+        panel.spacing.y    = unit(1.2, "lines"),     # gap between groups
+        strip.placement    = "outside",
+        strip.text.y.left  = element_text(angle = 0, hjust = 1, face = "bold"),
+        legend.position    = "none",
+        axis.text.y        = element_text(color = "black"))
 
-ggsave("Plots_Paper/Forestplot_Comparison_O2.png", width = 10, height = 6)
+ggsave("Plots_Paper/Forestplot_Comparison_O2_test.png", width = 10, height = 9)
 ```
 
-### for seizure reduction
+
+## for outcome seizure reduction
 
 ```{r}
 # copas Orbit approach
@@ -2116,6 +2071,7 @@ copas_result_O1 <- copas_orb_adjustment(data_topiramate,
 ```
 
 ```{r, warning=FALSE}
+# Saracini and Held selection models
 resultLL_SeizureRed <- reORBadj(a = data_topiramate_unrep$T1,
                                 c = data_topiramate_unrep$C1,
                                 n1 = data_topiramate_unrep$N_t,
@@ -2199,15 +2155,13 @@ resultCC2_SeizureRed <- reORBadj(a = data_topiramate_unrep$T1,
 idx_o1 <- which(names(coef(kirkham_fit)) == "outcomeO1")
 
 # Format Kirkham result as a 1-row data frame matching your other models
-df_kirkham_O1 <- data.frame(
-  Model      = "Kirkham et al. (2012)",
-  logRR      = as.numeric(coef(kirkham_fit)[idx_o1]),
-  CI_low_log = as.numeric(kirkham_fit$ci.lb[idx_o1]),
-  CI_up_log  = as.numeric(kirkham_fit$ci.ub[idx_o1]),
-  RR         = exp(as.numeric(coef(kirkham_fit)[idx_o1])),
-  CI_low_RR  = exp(as.numeric(kirkham_fit$ci.lb[idx_o1])),
-  CI_up_RR   = exp(as.numeric(kirkham_fit$ci.ub[idx_o1]))
-)
+df_kirkham_O1 <- data.frame(Model      = "Kirkham et al. (2012)",
+                            logRR      = as.numeric(coef(kirkham_fit)[idx_o1]),
+                            CI_low_log = as.numeric(kirkham_fit$ci.lb[idx_o1]),
+                            CI_up_log  = as.numeric(kirkham_fit$ci.ub[idx_o1]),
+                            RR         = exp(as.numeric(coef(kirkham_fit)[idx_o1])),
+                            CI_low_RR  = exp(as.numeric(kirkham_fit$ci.lb[idx_o1])),
+                            CI_up_RR   = exp(as.numeric(kirkham_fit$ci.ub[idx_o1])))
 ```
 
 ```{r}
@@ -2219,34 +2173,26 @@ res_uni_plot <- list()   # reset per outcome, otherwise the O2 file also contain
     theta_cols <- paste0("log_", m, o)
     se_cols <- paste0("se_", m, o)
     
-   # cat(sprintf("Generating imputed data for Measure = %s\n", m))
-    
     # Run imputation ONCE here. The random pool is now locked in.
-    mi <- run_univariate_imputation(
-      data = data_topiramate,
-      theta_col = theta_cols,
-      se_col = se_cols,
-      m = m_imputations
-    )
+    mi <- run_univariate_imputation(data = data_topiramate,
+                                    theta_col = theta_cols,
+                                    se_col = se_cols,
+                                    m = m_imputations)
     
     # Extract the static Naive estimate for this measure
-    naive_df <- data.frame(
-      Approach = "Naive estimate",
-      Estimate = as.numeric(mi$res_naive$beta),
-      SE       = mi$res_naive$se,
-      CI_Lower = mi$res_naive$ci.lb,
-      CI_Upper = mi$res_naive$ci.ub
-    )
+    naive_df <- data.frame(Approach = "Naive estimate",
+                           Estimate = as.numeric(mi$res_naive$beta),
+                           SE       = mi$res_naive$se,
+                           CI_Lower = mi$res_naive$ci.lb,
+                           CI_Upper = mi$res_naive$ci.ub)
     
     # refit the imputed datasets once, reused for every delta and selection type
     fits_uni <- fit_imputations_uni(mi)
-    #failed_refits[paste0("Plot uni ", m, " O", o)] <- attr(fits_uni, "failed.proportion")
-    
+
     # Loop 2: Now test different deltas using the same imputed data
     for (delta in deltas) {
       
-      #cat(sprintf("  -> Calculating adjustments for delta = %s\n", delta))
-      
+
       # Importance sampling calculations over the static 'mi' object
       adj_eff <- adj_univariate(mi,
                                 delta = delta,
@@ -2265,7 +2211,7 @@ res_uni_plot <- list()   # reset per outcome, otherwise the O2 file also contain
       
       # Add metadata
       tmp$Measure   <- paste0("log ", m)
-      tmp$Selection <- delta  # Saved as numeric directly to avoid your earlier character bug!
+      tmp$Selection <- delta  # Saved as numeric directly 
       
       # Append to list
       res_uni_plot[[length(res_uni_plot) + 1]] <- tmp
@@ -2293,82 +2239,76 @@ adjusted_df_O1 <- plot_uni_df_O1 %>%
   
 final_uni_df_O1 <- adjusted_df_O1 %>%
     left_join(naive_df_O1, by = c("Selection"))
-  
+
+# save univariate naive estimate  
 df_naive_uni_O1 <- naive_df_O1 %>%
   slice(1) %>%
-  transmute(
-    Model      = "Naive Univariate Estimate",
-    logRR      = Estimate_unadjusted,
-    CI_low_log = CI_unadjusted_lower,
-    CI_up_log  = CI_unadjusted_upper,
-    RR         = exp(logRR),
-    CI_low_RR  = exp(CI_low_log),
-    CI_up_RR   = exp(CI_up_log)
-  )
+  transmute(Model      = "Naive Univariate Estimate",
+            logRR      = Estimate_unadjusted,
+            CI_low_log = CI_unadjusted_lower,
+            CI_up_log  = CI_unadjusted_upper,
+            RR         = exp(logRR),
+            CI_low_RR  = exp(CI_low_log),
+            CI_up_RR   = exp(CI_up_log))
 ```
 
 
 
 ```{r}
-
 plot_biv_df_O1 <- subset(plot_biv_df, Outcome == "O1")
  
 # Format Naive Bivariate row
 df_naive_biv_O1 <- naive_part %>%
   filter(Outcome == "O1") %>%
   slice(1) %>%
-  transmute(
-    Model      = "Naive Bivariate Estimate",
-    logRR      = Estimate_unadjusted,
-    CI_low_log = CI_unadjusted_lower,
-    CI_up_log  = CI_unadjusted_upper,
-    RR         = exp(logRR),
-    CI_low_RR  = exp(CI_low_log),
-    CI_up_RR   = exp(CI_up_log)
-  )
+  transmute(Model      = "Naive Bivariate Estimate",
+            logRR      = Estimate_unadjusted,
+            CI_low_log = CI_unadjusted_lower,
+            CI_up_log  = CI_unadjusted_upper,
+            RR         = exp(logRR),
+            CI_low_RR  = exp(CI_low_log),
+            CI_up_RR   = exp(CI_up_log))
 ```
 
 
 ```{r}
 #  Format the Logistic ORB results
 df_logistic_biv_O1 <- plot_biv_df_O1 %>%
-  mutate(
-    stat_label = ifelse(Z_score == TRUE, "z", "\u03b8\u0302"),
-    Model = paste0("Biv-MI-ORB (\u03b4 = ", Selection, ", s = ", stat_label, ")"),
-    logRR = Estimate_adjusted,
-    CI_low_log = CI_adjusted_lower,
-    CI_up_log  = CI_adjusted_upper,
-    RR         = exp(logRR),
-    CI_low_RR  = exp(CI_low_log),
-    CI_up_RR   = exp(CI_up_log)
-  ) %>%
+  mutate(stat_label = ifelse(Z_score == TRUE, "z", "\u03b8\u0302"),
+         Model = paste0("Bivariate ORB-adjustment \u03b4 = ", 
+                        Selection, ", s = ", stat_label, ""),
+         logRR = Estimate_adjusted,
+         CI_low_log = CI_adjusted_lower,
+         CI_up_log  = CI_adjusted_upper,
+         RR         = exp(logRR),
+         CI_low_RR  = exp(CI_low_log),
+         CI_up_RR   = exp(CI_up_log)) %>%
   dplyr::select(Model, logRR, CI_low_log, CI_up_log, RR, CI_low_RR, CI_up_RR)
 
 #  Format the Logistic ORB results
 df_logistic_formatted <- final_uni_df_O1 %>%
-  mutate(
-    stat_label = ifelse(Z_score == TRUE, "z", "\u03b8\u0302"),
-    Model = paste0("Uni-MI-ORB (\u03b4 = ", Selection, ", s = ", stat_label, ")"),
-    logRR = estimate_logRR,
-    CI_low_log = ci_lower_logRR,
-    CI_up_log  = ci_upper_logRR,
-    RR         = exp(logRR),
-    CI_low_RR  = exp(CI_low_log),
-    CI_up_RR   = exp(CI_up_log)
-  ) %>%
+  mutate(stat_label = ifelse(Z_score == TRUE, "z", "\u03b8\u0302"),
+         Model = paste0("Univariate ORB-adjustment \u03b4 = ",
+                        Selection, ", s = ", stat_label, ""),
+         logRR = estimate_logRR,
+         CI_low_log = ci_lower_logRR,
+         CI_up_log  = ci_upper_logRR,
+         RR         = exp(logRR),
+         CI_low_RR  = exp(CI_low_log),
+         CI_up_RR   = exp(CI_up_log)) %>%
   dplyr::select(Model, logRR, CI_low_log, CI_up_log, RR, CI_low_RR, CI_up_RR)
 
 #  Results list for the existing models
-results_list <- list("Copas (ORBIT Adjusted) (FE)"        = copas_result_O1,
+results_list <- list("Copas ORBIT Adjusted (FE)"        = copas_result_O1,
                      "Saracini: Piecewise constant"       = resultLL_SeizureRed,
                      "Saracini: Constant-Decreasing"      = resultLC_SeizureRed,
                      "Saracini: Decreasing-Constant"      = resultCL_SeizureRed,
-                     "Saracini: Piecewise Decreasing (1)" = resultCC2_SeizureRed,
-                     "Saracini: Piecewise Decreasing (2)" = resultCC1_SeizureRed)
+                     "Saracini: Piecewise Decreasing (1)" = resultCC1_SeizureRed,
+                     "Saracini: Piecewise Decreasing (2)" = resultCC2_SeizureRed)
 
 # Extraction helper
 extract_model_estimates <- function(res, name) {
-  if (name == "Copas (ORBIT Adjusted) (FE)") {
+  if (name == "Copas ORBIT Adjusted (FE)") {
     mu  <- res$estimate_logRR
     low <- res$ci_lower_logRR
     up  <- res$ci_upper_logRR
@@ -2399,48 +2339,53 @@ df_all_models <- bind_rows(df_naive_uni_O1,
                            df_logistic_biv_O1)
 
 # Add a category variable for grouped coloring
-df_all_models <- df_all_models |>
-  mutate(
-    Category = case_when(
-      grepl("Naive", Model) ~ "Naive",
-      grepl("Copas", Model)      ~ "Copas",
-      grepl("Saracini", Model)   ~ "Saracini & Held",
-      grepl("Uni-MI-ORB", Model)   ~ "Uni-MI-ORB",
-      grepl("Biv-MI-ORB", Model)   ~ "Biv-MI-ORB",
-      grepl("Kirkham", Model)      ~ "Kirkham",
-      TRUE                       ~ "Other"
-    ),
-    Model = factor(Model, levels = rev(unique(Model)))
-  )
+df_all_models <- df_all_models %>%
+  mutate(Category = case_when(
+            grepl("Naive", Model) ~ "Naive",
+            grepl("Copas", Model)      ~ "Copas et al.",
+            grepl("Saracini", Model)   ~ "Saracini & Held",
+            grepl("Univariate ORB-adjustment", Model)   ~ "Univariate ORB-adjustment",
+            grepl("Bivariate ORB-adjustment", Model)   ~ "Bivariate ORB-adjustment",
+            grepl("Kirkham", Model)      ~ "Kirkham et al.",
+            TRUE                       ~ "Other"),
+        Model = factor(Model, levels = rev(unique(Model))))
 ```
 
+
 ```{r}
-# Create label column "RR [CI_low, CI_up]"
-df_plot <- df_all_models |>
-  mutate(
-    # Format text: e.g. "3.22 [1.27, 8.65]"
-    label_text = sprintf("%.2f [%.2f, %.2f]", RR, CI_low_RR, CI_up_RR),
-    # Preserve vertical ordering
-    Model = factor(Model, levels = rev(unique(Model)))
-  )
+df_plot <- df_plot %>%
+  mutate(Category = factor(Category,
+                           levels = c("Naive", "Copas et al.", "Saracini & Held",
+                                      "Univariate ORB-adjustment", "Kirkham et al.",
+                                      "Bivariate ORB-adjustment")))
+# rename methods for plotting
+df_plot <- df_plot %>%
+  mutate(Model_short = as.character(Model) |>
+         str_remove("^(Saracini: |Univariate ORB-adjustment |Bivariate ORB-adjustment
+                    |Copas )") |>  # drop prefix that duplicates the category
+         str_replace("^Naive (\\w+) Estimate$", "\\1"), 
+         Model_short = if_else(grepl("^Kirkham", Model_short),
+                               "Multivariate Meta-analysis", Model_short),
+         Model_short = factor(Model_short, levels = rev(unique(Model_short))))
 
-ggplot(df_plot, aes(x = logRR, y = Model, color = Category)) +
-  # Reference line at No Effect (RR = 1)
+ggplot(df_plot, aes(x = logRR, y = Model_short)) +
   geom_vline(xintercept = 0, linetype = "dashed", color = "gray60") +
-  # Error bars and point estimates
-  geom_errorbarh(aes(xmin = CI_low_log, xmax = CI_up_log), width = 0.25, linewidth = 0.8) +
-  geom_point(shape = 18, size = 3.5) +
-  # Logarithmic scale with margin space for the text column
-  #scale_x_continuous(limits = c(x_min - 0.05 * x_range,x_max + 0.05 * x_range)) +
-  # Allow text to sit outside default clipping area if needed
+  geom_errorbarh(aes(xmin = CI_low_log, xmax = CI_up_log),
+                 width = 0.25, linewidth = 0.8) +
+  geom_point(shape = 18, size = 3.5) +   # optional: shapes instead of colors
+  facet_grid(Category ~ ., scales = "free_y", space = "free_y", switch = "y") +
+  scale_y_discrete(expand = expansion(add = 0.8)) +  # extra space within each block
+  #scale_x_continuous(limits = c(x_min - 0.05 * x_range, x_max + 0.05 * x_range)) +
   coord_cartesian(clip = "off") +
-  labs(x = "Log RR", y = NULL, color = " ") +
+  labs(x = "Log RR", y = NULL) +
   theme_minimal(base_size = 12) +
-  theme(
-    panel.grid.minor = element_blank(),
-    legend.position  = "none",
-    plot.title       = element_text(face = "bold", hjust = 0),
-    axis.text.y      = element_text(face = "bold", color = "black"))
+  theme(panel.grid.minor   = element_blank(),
+        panel.grid.major.y = element_blank(),
+        panel.spacing.y    = unit(1.2, "lines"),     # gap between groups
+        strip.placement    = "outside",
+        strip.text.y.left  = element_text(angle = 0, hjust = 1, face = "bold"),
+        legend.position    = "none",
+        axis.text.y        = element_text(color = "black"))
 
-ggsave("Plots_Paper/Forestplot_Comparison_O1.png", width = 10, height = 6)
+ggsave("Plots_Paper/Forestplot_Comparison_O1_test.png", width = 10, height = 9)
 ```
