@@ -1,12 +1,11 @@
 ---
-title: "03.Application_plots.Rmd"
-author: "Cora Burgwinkel"
+title: "Plots for Application"
 output: html_document
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
-knitr::opts_knit$set(root.dir = "..")   # paths relative to the repository root, as in 01 and 02
+knitr::opts_knit$set(root.dir = "..") # paths relative to the repository root
 
 # load libraries
 library(dplyr)
