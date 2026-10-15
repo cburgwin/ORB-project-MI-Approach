@@ -48,7 +48,7 @@ n_cores       <- 48
 # Scenario grid
 # ---------------------------------------------------------
 
-run_type <- "heterogeneous_size"   # "tryout", "full_grid", "misspecified_delta", "different_rhos"
+run_type <- "different_rhos"   # e.g. main_scenario", "misspecified_delta", "different_rhos", "global_correlation"
 
 # one folder per run
 run_tag <- paste0(run_type, "_", Sys.Date())
@@ -62,12 +62,13 @@ out_dir <- file.path("Data", "Sim_summary")
 if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
 
 scenarios_grid <- switch (run_type, 
-                          "tryout" = expand.grid(
+                          
+                          "main_scenario" = expand.grid(
                             K           = c(6, 12, 25),
                             p1          = c(0.2),
                             tau2_val    = c(0, 0.02, 0.06, 0.36),
-                            theta_1     = c(0),
-                            theta_2     = c(0),
+                            theta_1     = c(0.4),
+                            theta_2     = c(0.4),
                             rho_b       = c(0.8),
                             rho_w       = c(0.8),
                             delta_sim   = seq(0, 1, by = 0.2),
@@ -77,13 +78,57 @@ scenarios_grid <- switch (run_type,
                           )  %>% unique() %>%
                             dplyr::filter(delta_sim == delta_est),
                           
+                          "main_high_prop" = expand.grid(
+                            K           = c(6, 12, 25),
+                            p1          = 0.4,
+                            tau2_val    = c(0, 0.02, 0.06, 0.36),
+                            theta_1     = 0.4,
+                            theta_2     = 0.4,
+                            rho_b       = 0.8,
+                            rho_w       = 0.8,
+                            delta_sim   = seq(0, 1, by = 0.2),
+                            delta_est   = seq(0, 1, by = 0.2),
+                            select_type = c("zscore", "effect"),
+                            stringsAsFactors = FALSE
+                          )  %>% unique() %>%
+                            dplyr::filter(delta_sim == delta_est),
                           
-                          "full_grid" = expand.grid(
+                          "low_treatment" = expand.grid(
+                            K           = c(6, 12, 25),
+                            p1          = 0.2,
+                            tau2_val    = c(0, 0.02, 0.06, 0.36),
+                            theta_1     = 0,
+                            theta_2     = 0,
+                            rho_b       = 0.8,
+                            rho_w       = 0.8,
+                            delta_sim   = seq(0, 1, by = 0.2),
+                            delta_est   = seq(0, 1, by = 0.2),
+                            select_type = c("zscore", "effect"),
+                            stringsAsFactors = FALSE
+                          )  %>% unique() %>%
+                            dplyr::filter(delta_sim == delta_est),
+                          
+                          "global_correlation" = expand.grid(
                             K           = c(6, 12, 25),
                             p1          = c(0.2, 0.4),
                             tau2_val    = c(0, 0.02, 0.06, 0.36),
-                            theta_1     = c(0, 0.4),
-                            theta_2     = c(0, 0.4),
+                            theta_1     = 0.4,
+                            theta_2     = 0.4,
+                            rho_b       = 0,
+                            rho_w       = 0,
+                            delta_sim   = seq(0, 1, by = 0.2),
+                            delta_est   = seq(0, 1, by = 0.2),
+                            select_type = c("zscore", "effect"),
+                            stringsAsFactors = FALSE
+                          )  %>% unique() %>%
+                            dplyr::filter(delta_sim == delta_est),
+                          
+                          "different_rhos" = expand.grid(
+                            K           = c(6, 12, 25),
+                            p1          = 0.2,
+                            tau2_val    = c(0, 0.02, 0.06, 0.36),
+                            theta_1     = 0.4,
+                            theta_2     = 0.4,
                             rho_b       = c(0, 0.8),
                             rho_w       = c(0, 0.8),
                             delta_sim   = seq(0, 1, by = 0.2),
@@ -91,17 +136,16 @@ scenarios_grid <- switch (run_type,
                             select_type = c("zscore", "effect"),
                             stringsAsFactors = FALSE
                           )  %>% unique() %>%
-                            dplyr::filter(delta_sim == delta_est & rho_w == rho_b),
-                          
+                            dplyr::filter(delta_sim == delta_est & rho_w != rho_b),
                           
                           "misspecified_delta" = expand.grid(
                             K           = c(6, 12, 25),
-                            p1          = c(0.2),
+                            p1          = 0.2,
                             tau2_val    = c(0, 0.02, 0.06, 0.36),
-                            theta_1     = c(0.4),
-                            theta_2     = c(0.4),
-                            rho_b       = c(0.8),
-                            rho_w       = c(0.8),
+                            theta_1     = 0.4,
+                            theta_2     = 0.4,
+                            rho_b       = 0.8,
+                            rho_w       = 0.8,
                             delta_sim   = seq(0, 1, by = 0.2),
                             delta_est   = seq(0, 1, by = 0.2),
                             select_type = c("zscore", "effect"),
@@ -111,12 +155,12 @@ scenarios_grid <- switch (run_type,
                           
                           "heterogeneous_size" = expand.grid(
                             K           = c(6, 12, 25),
-                            p1          = c(0.2),
+                            p1          = 0.2,
                             tau2_val    = c(0, 0.02, 0.06, 0.36),
-                            theta_1     = c(0.4),
-                            theta_2     = c(0.4),
-                            rho_b       = c(0.8),
-                            rho_w       = c(0.8),
+                            theta_1     = 0.4,
+                            theta_2     = 0.4,
+                            rho_b       = 0.8,
+                            rho_w       = 0.8,
                             delta_sim   = seq(0, 1, by = 0.2),
                             delta_est   = seq(0, 1, by = 0.2),
                             select_type = c("zscore", "effect"),
@@ -124,22 +168,6 @@ scenarios_grid <- switch (run_type,
                             stringsAsFactors = FALSE
                           ) %>% unique() %>%
                             dplyr::filter(delta_sim == delta_est),
-                          
-                          
-                          "different_rhos" = expand.grid(
-                            K           = c(6, 12, 25),
-                            p1          = c(0.2),
-                            tau2_val    = c(0, 0.02, 0.06, 0.36),
-                            theta_1     = c(0),
-                            theta_2     = c(0),
-                            rho_b       = c(0, 0.8),
-                            rho_w       = c(0, 0.8),
-                            delta_sim   = seq(0, 1, by = 0.2),
-                            delta_est   = seq(0, 1, by = 0.2),
-                            select_type = c("zscore", "effect"),
-                            stringsAsFactors = FALSE
-                          )  %>% unique() %>%
-                            dplyr::filter(delta_sim == delta_est & rho_w != rho_b),
                           
                           stop("unknown run_type: ", run_type)
 ) 
@@ -205,7 +233,7 @@ run_ORB <- function(scenario_idx) {
   output_file <- sprintf("%s/scenario_%05d.rds", save_dir, scenario_idx)
   if (file.exists(output_file)) return(NULL)
   
-  set.seed (100 + scenario_idx) # each scenario is reproducible !!
+  set.seed (100 + scenario_idx) # seed is tied to row index
   
   # run through scenario grid
   s <- scenarios_grid[scenario_idx, ]
@@ -239,8 +267,9 @@ run_ORB <- function(scenario_idx) {
   # instead of printing, add the error to the vector
   log_error <- function(stage, e) {
     error_log <<- c(error_log, paste0(stage, ": ", conditionMessage(e)))
-    message(stage, " failed: ", conditionMessage(e)) #still prints in the clustter 
+    message(stage, " failed: ", conditionMessage(e)) #still prints in the cluster 
   }
+  
   # Maximum number of outer attempts
   max_attempts <- 5 * n_sim
   
@@ -263,9 +292,7 @@ run_ORB <- function(scenario_idx) {
       sei      = as.numeric(t(as.matrix(full_data[, c("O1_sei", "O2_sei")])))
     )
     
-    # IDEA: we want to see the results a statistician would get if there was NO ORB
-    # of course also this smart statistician would need to estimate rho_w with pearson 
-    # and let rma.mv estimate tau and rho_b
+    # Idea: we want to see the results a statistician would get if there was no ORB
     
     # To go back to the oracle benchmark, use cov12 <- rho_w * ... (true value).
     rho_hat_full <- cor(full_data$O1_yi, full_data$O2_yi)
@@ -298,8 +325,6 @@ run_ORB <- function(scenario_idx) {
               u   = res_biv$ci.ub[1])
     )
   }
-  
-  
   
   compute_naive <- function(obs_data){
     
@@ -348,6 +373,7 @@ run_ORB <- function(scenario_idx) {
          n_complete_pairs = n_complete_pairs,
          rho_hat = rho_hat)
   }
+  
   # =========================================================
   # Main loop
   # =========================================================
@@ -598,7 +624,7 @@ run_ORB <- function(scenario_idx) {
          Failure_Rate = mean(!valid))
   }
   
-  # method-wise analysis
+  # method-wise deletion
   full_m <- metric_fun(res_df$full,
                        res_df$full_ci_l,
                        res_df$full_ci_u,
@@ -629,7 +655,7 @@ run_ORB <- function(scenario_idx) {
   
   res_common <- res_df[common_success, ]
   
-  # repetition-wise analysis
+  # repetition-wise deletion
   full_common <- metric_fun(res_common$full,
                             res_common$full_ci_l,
                             res_common$full_ci_u,
