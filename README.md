@@ -19,34 +19,34 @@ The folder contains the file `SimProtocol.Rnw` file, which can be compiled in R 
 ### Code Folder
 This folder contains all functions used for the project.
 - `00.Functions.R` contains all functions necessary to implement our method:
-**Preprocessing**
+  
+*Preprocessing*
 1. `impute_missing_se()` imputes missing standard errors for one outcome at a time from the reported studies, following the formula from Copas et al. [^6].
 
-**Univariate method**
+*Univariate method*
 
 2. `run_univariate_imputation()` generates multiple imputations of the unreported effect estimates for one outcome under missing at random (MAR). It uses the conditional normal distribution given the reported studies.
 3. `fit_imputations_uni()` fits a random-effects meta-analysis to each completed dataset. 
 4. `pool_univariate()` applies ORB importance weights to the fits from `fit_imputations_uni()` and pools them with Rubin's rules. 
 5. `adj_univariate()` wraps `fit_imputations_uni()` and `pool_univariate()`.
 
-**Bivariate method**
+*Bivariate method*
 
 6. `run_bivariate_imputation()` generates multiple imputations of the unreported estimates for outcome 1 under MAR, using both outcomes jointly. The within-study correlation `rho_w` can be fixed or estimated from the data (Pearson correlation, with its uncertainty propagated across imputations).
 7. `fit_imputations_bivariate()` fits a bivariate random-effects meta-analysis to each completed dataset.
 8. `pool_bivariate()` applies the ORB importance weights to the fits from `fit_imputations_biv()` and pools them with Rubin's rules. It returns adjusted estimates for both outcomes.
 9. `adj_bivariate()` wraps `fit_imputations_biv()` and `pool_bivariate()`, analogous to `adj_univariate()`.
 
-**Simulation**
+*Simulation*
 
 10. `generate_bivariate_ma()` simulates a complete bivariate meta-analysis, with true study effects drawn from a bivariate normal and within-study covariances from a Wishart. It optionally includes one large study (heterogeneous study sizes).
 11. `impose_orb()` imposes ORB on outcome 1 of the data from `generate_bivariate_ma()`. Studies are selected via a logistic reporting model on the z-score or the effect, calibrated to a target reporting rate. 
-12. `expit()` and `logit()` are helpers for the reporting model in `impose_orb()`.
 
 - `01.Application_prep.R`creates the topiramate dataset `df_topiramate.rds` in the data folder.
 - `02.Application_fit.R` uses the data created with `01.Application_prep.R`, sources `00.Functions.R` and adjusts for ORB. It also produces `Table_2.rds` in data folder, which corresponds to table 2 in the paper.
 - `03.Application_Plots.Rmd` reads the datasets created with `02.Application_fit.R`, which are saved in the data folder, and creates all plots for the application.
 - `04.SimulationStudy.R` runs a loop over the functions in `00.Functions.R` for all considered scenarios in the simulation study.
-- `05.SimulationStudy_Plots.Rmd` reads the datasets created with `05.SimulationStudy.R`, which are saved in the data folder (`data_simulation_S.csv` and `data_simulation_supp.csv`) and creates all plots for the simulation study.
+- `05.SimulationStudy_Plots.Rmd` reads the datasets created with `05.SimulationStudy.R`, which are saved in the `Data/Sim_summary` folder, and creates all plots for the simulation study.
 
 ### Data Folder
 This folder contains all data for the application as well as the simulation study.
@@ -55,8 +55,7 @@ This folder contains all data for the application as well as the simulation stud
 - `data_uni_df_O2.csv` contains the data for univariate ORB adjustment for outcome 2 "seizure freedom" from the application.
 - `df_topiramate.rds` is created by file `01.Application_prep.R` and contains the real clinical data affected by ORB.
 - `Table_2.rds` is produced by file `02.Application_fit.R` and provides the results for the forest plot in the final paper.
-- `data_simulation_S.csv` contains the data from the simulation study for the plots in the main paper.
-- `data_simulation_supp.csv` contains the data from the simulation study for the supplementary material.
+- `Sim_summary/` contains all datasets for the simulation study.
 
 ## Reproducibility
 To ensure the reproducibility of this analysis, the computational environment details are provided below. 
@@ -187,7 +186,6 @@ A BibTeX entry is given by
 [^2]: Kerry Dwan, Carrol Gamble, Paula R Williamson, Jamie J Kirkham, and Reporting Bias Group. Systematic review of the empirical evidence of study publication bias and outcome
 reporting bias—an updated review. PloS one, 8(7):e66844, 2013. doi: https://doi.org/10.1371/journal.pone.0066844.
 [^3]: John PA Ioannidis. Clinical trials: what a waste. BMJ, 349, 2014. doi: https://doi.org/10.1136/bmj.g7089.
-[^4]: Elizabeth T Thomas and Carl Heneghan. Catalogue of bias: selective outcome reporting bias. BMJ Evidence-Based Medicine, 27(6):370–372, 2022. doi: https://doi.org/10.1136/
-bmjebm-2021-111845.
+[^4]: Elizabeth T Thomas and Carl Heneghan. Catalogue of bias: selective outcome reporting bias. BMJ Evidence-Based Medicine, 27(6):370–372, 2022. doi: https://doi.org/10.1136/bmjebm-2021-111845.
 [^5]: James Carpenter, Gerta Rücker, and Guido Schwarzer. Assessing the sensitivity of meta-analysis to selection bias: a multiple imputation approach. Biometrics, 67(3):1066–1072, 2011. doi: https://doi.org/10.1111/j.1541-0420.2010.01498.x
 [^6]: John Copas, Kerry Dwan, Jamie Kirkham, and Paula Williamson. A Model-based Correction for Outcome Reporting Bias in Meta-analysis. Biostatistics, 15(2):370–383, 2014. doi: https://doi.org/10.1093/biostatistics/kxt046
