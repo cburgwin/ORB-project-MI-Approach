@@ -1,12 +1,11 @@
 ---
 title: "Simulation Study Plots"
-author: "Cora Burgwinkel"
-date: "2026-05-26"
 output: html_document
 ---
 
 ```{r setup, include=FALSE}
-
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_knit$set(root.dir = "..")
 
 # load libaries
 library(dplyr)
@@ -20,821 +19,2395 @@ library(ggpubr)
 
 # Plots Simulation Study
 
+## theta1 = theta2 = 0.4, rho_B = 0.8, rho_W = 0.8, p_i = 0.2, n_sim = 1900, M = 200, delta_sim = delta_est, variance and tau estimated
 
-
-##  theta1 = theta2 = 0.4, rho_B = 0.4, rho_W = 0.4, p_i = 0.2, n_sim = 1900, M = 200, delta_sim = delta_est
-
-
-read data in
-```{r, echo = FALSE, cache =TRUE}
-
-res_simstudy <- read.csv2("Data/data_simulation_S.csv", sep = ",")
+```{r}
+res_simstudy <- read.csv2("Data/Sim_summary/data_simulation_main_scenario_2026_09_22.csv", sep = ",")
 
 # turn data into long format for simulation parameters
 theta04_long <- res_simstudy %>%
-  pivot_longer(
-    cols = matches("^(Bias|MSE|Coverage|CI_Width)_"), 
-    names_to = c(".value", "method"),
-    names_pattern = "^(Bias|MSE|Coverage|CI_Width)_(.*)"
-  )
+  pivot_longer(cols = matches("^(Bias|MSE|Coverage|CI_Width)_"), 
+               names_to = c(".value", "method"),
+               names_pattern = "^(Bias|MSE|Coverage|CI_Width)_(.*)")
 
+# add I2 variable
+theta04_long <- theta04_long %>%
+  mutate(I2 = case_when(tau2_val == 0.00 ~ "0",
+                        tau2_val == 0.02 ~ "30",
+                        tau2_val == 0.06 ~ "60",
+                        tau2_val == 0.36 ~ "90",
+                        TRUE             ~ NA_character_))
 
 # make sure all variables are numeric
 theta04_long <- theta04_long %>%
   mutate(across(c(K, theta_1, theta_2, tau2_val, rho_b, rho_w, delta_sim, p1, delta_est,
-                  Avg_Redraws, Bias, MSE, Coverage, CI_Width, Failure_Rate, Avg_Redraws), as.numeric))
-
-# add I2 variable
-theta04_long <- theta04_long %>%
-  mutate(I2 = case_when(
-    tau2_val == 0.00 ~ "0",
-    tau2_val == 0.02 ~ "30",
-    tau2_val == 0.06 ~ "60",
-    tau2_val == 0.36 ~ "90",
-    TRUE             ~ NA_character_  # Catches any unexpected values safely
-  ))
-
-```
-
-plot bias
-
-```{r, echo = FALSE, fig.width=10, fig.height=10}
-theta04_long1 <- subset(theta04_long, select_type == "zscore")
-theta04_long2 <- subset(theta04_long, select_type == "effect")
-
-range(theta04_long1$Bias, theta04_long2$Bias, na.rm = TRUE)
-
-plot_A <- ggplot(theta04_long1, aes(x = delta_est, y = Bias, color = as.factor(method))) +
-  geom_line(aes(group = method), linewidth = 1.2) +
-   geom_hline(aes(yintercept = 0), color = "black", linetype = "dashed") +
-  facet_grid(I2 ~ K,
-           labeller = labeller(
-             K = as_labeller(function(x) paste0("K == ", x), 
-                               default = label_parsed),
-            I2 = as_labeller(function(x) paste0("I^2 == ", x, "*'%'"), 
-                                default = label_parsed) # or label_both if you want 'tau^2 = 0'
-           )) +
-  labs(x = expression("Selection Weight"~delta),
-       y = "Bias",
-       color = "Method type") +
-  scale_color_manual(name = " ",
-                     values = c("Naive_Biv" = "lightblue1", 
-                                "Adj_Biv" = "hotpink3", 
-                                 "Full" = "navy", 
-                                "Adj_Uni" = "thistle"),
-                      labels = c("Naive_Biv" = "Naive",
-                                 "Full" = "Complete Data",
-                                 "Adj_Biv" = "Bivariate",
-                                 "Adj_Uni" = "Univariate")) +
-  scale_x_continuous(breaks = seq(0, 1, by = 0.2)) +
-  scale_y_continuous(limits = c(-0.12, 0.22), breaks = seq(-0.1, 0.2, by = 0.1)) +
-  theme_minimal() +
-    theme(  
-      plot.margin = margin(20, 10, 10, 10),
-      plot.title = element_text(size = 16, hjust = 0.5), 
-      axis.title = element_text(size = 16), 
-      legend.position = "bottom",
-      strip.text.x = element_text(size = 16),
-      strip.text.y = element_text(size = 14, angle = 0, hjust = 0.5, vjust = 0.5),
-      legend.text = element_text(size = 16),
-      legend.title = element_text(size = 16))
-
-plot_B <-  ggplot(theta04_long2, aes(x = delta_est, y = Bias, color = as.factor(method))) +
-  geom_line(aes(group = method), linewidth = 1.2) +
-   geom_hline(aes(yintercept = 0), color = "black", linetype = "dashed") +
-   facet_grid(I2 ~ K,
-           labeller = labeller(
-             K = as_labeller(function(x) paste0("K == ", x),  
-                               default = label_parsed),
-            I2 = as_labeller(function(x) paste0("I^2 == ", x, "*'%'"), 
-                                default = label_parsed) # or label_both if you want 'tau^2 = 0'
-           )) +
-  labs(x = expression("Selection Weight"~delta),
-       y = "Bias",
-       color = "Method type") +
-    scale_color_manual(name = " ",
-                     values = c("Naive_Biv" = "lightblue1", 
-                                "Adj_Biv" = "hotpink3", 
-                                 "Full" = "navy", 
-                                "Adj_Uni" = "thistle"),
-                      labels = c("Naive_Biv" = "Naive",
-                                 "Full" = "Complete Data",
-                                 "Adj_Biv" = "Bivariate",
-                                 "Adj_Uni" = "Univariate")) +
-  scale_x_continuous(breaks = seq(0, 1, by = 0.2)) +
-  scale_y_continuous(limits = c(-0.12, 0.22), breaks = seq(-0.1, 0.2, by = 0.1)) +
-  theme_minimal() +
-    theme( 
-      plot.margin = margin(20, 10, 10, 10),
-      plot.title = element_text(size = 16, hjust = 0.5), 
-      axis.title = element_text(size = 16), 
-      legend.position = "bottom",
-      strip.text.x = element_text(size = 16),
-      strip.text.y = element_text(size = 14, angle = 0, hjust = 0.5, vjust = 0.5),
-      legend.text = element_text(size = 16),
-      legend.title = element_text(size = 16))
-
-ggarrange(
-  plot_A,
-  plot_B,
-  common.legend = TRUE,
-  legend = "bottom",
-  nrow = 2,
-  labels = c("A Selection on z-score", "B Selection on treatment effect"),
-  hjust = 0,
-  font.label = list(size = 16, face = "bold"),
-  label.y = 1.01,
-  heights = c(1, 1.1)
-)
-
-ggsave("Plots_Paper/SimStudy_Bias.png", width = 10, height = 10)
+                  Avg_Redraws, Bias, MSE, Coverage, CI_Width, I2), as.numeric))
 ```
 
 
-plot MSE
+```{r, fig.width=10, fig.height=12}
+theta04_plot <- theta04_long %>%
+  filter(select_type %in% c("zscore", "effect"),
+         method %in% c("Naive_Biv", "Adj_Biv", "Full", "Adj_Uni")) %>%
+  mutate(select_type = factor(select_type,
+                              levels = c("zscore", "effect"),
+                              labels = c("Selection on\nz-score",
+                                         "Selection on\ntreatment effect")))
 
-```{r, echo = FALSE, fig.width=10, fig.height=10}
+# check the actual bias range per I2 level to choose sensible limits
+theta04_plot %>%
+  group_by(I2) %>%
+  summarise(min_bias = min(Bias, na.rm = TRUE),
+            max_bias = max(Bias, na.rm = TRUE))
 
-plot_A <- ggplot(theta04_long1, aes(x = delta_est, y = MSE, color = as.factor(method))) +
-  geom_line(aes(group = method), linewidth = 1.2) +
-  facet_grid(I2 ~ K,
-           labeller = labeller(
-             K = as_labeller(function(x) paste0("K == ", x), 
-                               default = label_parsed),
-            I2 = as_labeller(function(x) paste0("I^2 == ", x, "*'%'"), 
-                                default = label_parsed) # or label_both if you want 'tau^2 = 0'
-           )) +
-  labs(x = expression("Selection Weight"~delta),
-       y = "MSE",
-       color = "Method type") +
-  scale_color_manual(name = " ",
-                     values = c("Naive_Biv" = "lightblue1", 
-                                "Adj_Biv" = "hotpink3", 
-                                 "Full" = "navy", 
-                                "Adj_Uni" = "thistle"),
-                      labels = c("Naive_Biv" = "Naive",
-                                 "Full" = "Complete Data",
-                                 "Adj_Biv" = "Bivariate",
-                                 "Adj_Uni" = "Univariate")) +
-  scale_x_continuous(breaks = seq(0, 1, by = 0.2)) +
-  theme_minimal() +
-    theme(  
-      plot.margin = margin(20, 10, 10, 10),
-      plot.title = element_text(size = 16, hjust = 0.5), 
-      axis.title = element_text(size = 16), 
-      legend.position = "bottom",
-      strip.text.x = element_text(size = 16),
-      strip.text.y = element_text(size = 14, angle = 0, hjust = 0.5, vjust = 0.5),
-      legend.text = element_text(size = 16),
-      legend.title = element_text(size = 16))
+# y-axis limits and tick spacing per I2 level (adjust after checking the table above)
+y_settings <- list("0"  = list(lim = c(-0.03, 0.04), by = 0.02),
+                   "30" = list(lim = c(-0.03, 0.06), by = 0.02),
+                   "60" = list(lim = c(-0.03, 0.08), by = 0.02),
+                   "90" = list(lim = c(-0.05, 0.22), by = 0.10))
 
-plot_B <-  ggplot(theta04_long2, aes(x = delta_est, y = MSE, color = as.factor(method))) +
-  geom_line(aes(group = method), linewidth = 1.2) +
-   geom_hline(aes(yintercept = 0), color = "black", linetype = "dashed") +
-   facet_grid(I2 ~ K,
-           labeller = labeller(
-             K = as_labeller(function(x) paste0("K == ", x),  
-                               default = label_parsed),
-            I2 = as_labeller(function(x) paste0("I^2 == ", x, "*'%'"), 
-                                default = label_parsed) # or label_both if you want 'tau^2 = 0'
-           )) +
-  labs(x = expression("Selection Weight"~delta),
-       y = "MSE",
-       color = "Method type") +
-    scale_color_manual(name = " ",
-                     values = c("Naive_Biv" = "lightblue1", 
-                                "Adj_Biv" = "hotpink3", 
-                                 "Full" = "navy", 
-                                "Adj_Uni" = "thistle"),
-                      labels = c("Naive_Biv" = "Naive",
-                                 "Full" = "Complete Data",
-                                 "Adj_Biv" = "Bivariate",
-                                 "Adj_Uni" = "Univariate")) +
-  scale_x_continuous(breaks = seq(0, 1, by = 0.2)) +
-  theme_minimal() +
-    theme(  
-      plot.margin = margin(20, 10, 10, 10),
-      plot.title = element_text(size = 16, hjust = 0.5), 
-      axis.title = element_text(size = 16), 
-      legend.position = "bottom",
-      strip.text.x = element_text(size = 16),
-      strip.text.y = element_text(size = 14, angle = 0, hjust = 0.5, vjust = 0.5),
-      legend.text = element_text(size = 16),
-      legend.title = element_text(size = 16))
-
-ggarrange(
-  plot_A,
-  plot_B,
-  common.legend = TRUE,
-  legend = "bottom",
-  nrow = 2,
-  labels = c("A Selection on z-score", "B Selection on treatment effect"),
-  hjust = 0,
-  font.label = list(size = 16, face = "bold"),
-  label.y = 1.01,
-  heights = c(1, 1.1)
-)
-
-ggsave("Plots_Paper/SimStudy_MSE.png", width = 10, height = 10)
-```
-
-Coverage
-
-
-```{r, echo = FALSE, fig.width=10, fig.height=10}
-range(theta04_long1$Coverage, theta04_long2$Coverage, na.rm = TRUE)
-
-plot_A <- ggplot(theta04_long1, aes(x = delta_est, y = Coverage, color = as.factor(method))) +
-  geom_line(aes(group = method), linewidth = 1.2) +
-  geom_hline(aes(yintercept = 0.95), color = "black", linetype = "dashed") +
-  facet_grid(I2 ~ K,
-           labeller = labeller(
-             K = as_labeller(function(x) paste0("K == ", x), 
-                               default = label_parsed),
-            I2 = as_labeller(function(x) paste0("I^2 == ", x, "*'%'"), 
-                                default = label_parsed) # or label_both if you want 'tau^2 = 0'
-           )) +
-  labs(x = expression("Selection Weight"~delta),
-       y = "Coverage",
-       color = "Method type") +
-  scale_color_manual(name = " ",
-                     values = c("Naive_Biv" = "lightblue1", 
-                                "Adj_Biv" = "hotpink3", 
-                                 "Full" = "navy", 
-                                "Adj_Uni" = "thistle"),
-                      labels = c("Naive_Biv" = "Naive",
-                                 "Full" = "Complete Data",
-                                 "Adj_Biv" = "Bivariate",
-                                 "Adj_Uni" = "Univariate")) +
-  scale_x_continuous(breaks = seq(0, 1, by = 0.2)) +
-  scale_y_continuous(limits = c(0.7, 1), breaks = seq(0.7, 1, by = 0.1)) +
-  theme_minimal() +
-    theme(  
-      plot.margin = margin(20, 10, 10, 10),
-      plot.title = element_text(size = 16, hjust = 0.5), 
-      axis.title = element_text(size = 16), 
-      legend.position = "bottom",
-      strip.text.x = element_text(size = 16),
-      strip.text.y = element_text(size = 14, angle = 0, hjust = 0.5, vjust = 0.5),
-      legend.text = element_text(size = 16),
-      legend.title = element_text(size = 16))
-
-plot_B <-  ggplot(theta04_long2, aes(x = delta_est, y = Coverage, color = as.factor(method))) +
-  geom_line(aes(group = method), linewidth = 1.2) +
-  geom_hline(aes(yintercept = 0.95), color = "black", linetype = "dashed") +
-   facet_grid(I2 ~ K,
-           labeller = labeller(
-             K = as_labeller(function(x) paste0("K == ", x),  
-                               default = label_parsed),
-            I2 = as_labeller(function(x) paste0("I^2 == ", x, "*'%'"), 
-                                default = label_parsed) # or label_both if you want 'tau^2 = 0'
-           )) +
-  labs(x = expression("Selection Weight"~delta),
-       y = "Coverage",
-       color = "Method type") +
-    scale_color_manual(name = " ",
-                     values = c("Naive_Biv" = "lightblue1", 
-                                "Adj_Biv" = "hotpink3", 
-                                 "Full" = "navy", 
-                                "Adj_Uni" = "thistle"),
-                      labels = c("Naive_Biv" = "Naive",
-                                 "Full" = "Complete Data",
-                                 "Adj_Biv" = "Bivariate",
-                                 "Adj_Uni" = "Univariate")) +
-  scale_x_continuous(breaks = seq(0, 1, by = 0.2)) +
-  scale_y_continuous(limits = c(0.7, 1), breaks = seq(0.7, 1, by = 0.1)) +
-  theme_minimal() +
-    theme(  
-      plot.margin = margin(20, 10, 10, 10),
-      plot.title = element_text(size = 16, hjust = 0.5), 
-      axis.title = element_text(size = 16), 
-      legend.position = "bottom",
-      strip.text.x = element_text(size = 16),
-      strip.text.y = element_text(size = 14, angle = 0, hjust = 0.5, vjust = 0.5),
-      legend.text = element_text(size = 16),
-      legend.title = element_text(size = 16))
-
-ggarrange(
-  plot_A,
-  plot_B,
-  common.legend = TRUE,
-  legend = "bottom",
-  nrow = 2,
-  labels = c("A Selection on z-score", "B Selection on treatment effect"),
-  hjust = 0,
-  font.label = list(size = 16, face = "bold"),
-  label.y = 1.01,
-  heights = c(1, 1.1)
-)
-
-ggsave("Plots_Paper/SimStudy_Coverage.png", width = 10, height = 10)
-```
-
-CI width
-
-```{r, echo = FALSE, fig.width=10, fig.height=10}
-
-plot_A <- ggplot(theta04_long1, aes(x = delta_est, y = CI_Width, color = as.factor(method))) +
-  geom_line(aes(group = method), linewidth = 1.2) +
-  facet_grid(I2 ~ K,
-           labeller = labeller(
-             K = as_labeller(function(x) paste0("K == ", x), 
-                               default = label_parsed),
-            I2 = as_labeller(function(x) paste0("I^2 == ", x, "*'%'"), 
-                                default = label_parsed) # or label_both if you want 'tau^2 = 0'
-           )) +
-  labs(x = expression("Selection Weight"~delta),
-       y = "Confidence Interval Width",
-       color = "Method type") +
-  scale_color_manual(name = " ",
-                     values = c("Naive_Biv" = "lightblue1", 
-                                "Adj_Biv" = "hotpink3", 
-                                 "Full" = "navy", 
-                                "Adj_Uni" = "thistle"),
-                      labels = c("Naive_Biv" = "Naive",
-                                 "Full" = "Complete Data",
-                                 "Adj_Biv" = "Bivariate",
-                                 "Adj_Uni" = "Univariate")) +
-  scale_x_continuous(breaks = seq(0, 1, by = 0.2)) +
-  theme_minimal() +
-    theme(  
-      plot.margin = margin(20, 10, 10, 10),
-      plot.title = element_text(size = 16, hjust = 0.5), 
-      axis.title = element_text(size = 16), 
-      legend.position = "bottom",
-      strip.text.x = element_text(size = 16),
-      strip.text.y = element_text(size = 14, angle = 0, hjust = 0.5, vjust = 0.5),
-      legend.text = element_text(size = 16),
-      legend.title = element_text(size = 16))
-
-plot_B <-  ggplot(theta04_long2, aes(x = delta_est, y = CI_Width, color = as.factor(method))) +
-  geom_line(aes(group = method), linewidth = 1.2) +
-   facet_grid(I2 ~ K,
-           labeller = labeller(
-             K = as_labeller(function(x) paste0("K == ", x),  
-                               default = label_parsed),
-            I2 = as_labeller(function(x) paste0("I^2 == ", x, "*'%'"), 
-                                default = label_parsed) # or label_both if you want 'tau^2 = 0'
-           )) +
-  labs(x = expression("Selection Weight"~delta),
-       y = "Confidence Interval Width",
-       color = "Method type") +
-    scale_color_manual(name = " ",
-                     values = c("Naive_Biv" = "lightblue1", 
-                                "Adj_Biv" = "hotpink3", 
-                                 "Full" = "navy", 
-                                "Adj_Uni" = "thistle"),
-                      labels = c("Naive_Biv" = "Naive",
-                                 "Full" = "Complete Data",
-                                 "Adj_Biv" = "Bivariate",
-                                 "Adj_Uni" = "Univariate")) +
-  scale_x_continuous(breaks = seq(0, 1, by = 0.2)) +
-  theme_minimal() +
-    theme(  
-      plot.margin = margin(20, 10, 10, 10),
-      plot.title = element_text(size = 16, hjust = 0.5), 
-      axis.title = element_text(size = 16), 
-      legend.position = "bottom",
-      strip.text.x = element_text(size = 16),
-      strip.text.y = element_text(size = 14, angle = 0, hjust = 0.5, vjust = 0.5),
-      legend.text = element_text(size = 16),
-      legend.title = element_text(size = 16))
+plot_bias_i2 <- function(i2_level,
+                         data = theta04_plot,
+                         settings = y_settings) {
   
-ggarrange(
-  plot_A,
-  plot_B,
-  common.legend = TRUE,
-  legend = "bottom",
-  nrow = 2,
-  labels = c("A Selection on z-score", "B Selection on treatment effect"),
-  hjust = 0,
-  font.label = list(size = 16, face = "bold"),
-  label.y = 1.01,
-  heights = c(1, 1.1)
-)
+  ylim_i2 <- settings[[i2_level]]$lim
+  ybreak  <- settings[[i2_level]]$by
+  
+  ggplot(filter(data, I2 == i2_level),
+         aes(x = delta_est, y = Bias, color = method)) +
+    geom_line(aes(group = method), linewidth = 1.2) +
+    geom_hline(yintercept = 0, color = "black", linetype = "dashed") +
+    facet_grid(select_type ~ K,
+               labeller = labeller(K = as_labeller(function(x) paste0("K == ", x),
+                                                   default = label_parsed))) +
+    labs(x = expression("Selection Weight"~delta),
+         y = "Bias") +
+    scale_color_manual(name = " ",
+                       values = c("Full"      = "#000000",
+                                  "Naive_Biv" = "#0072B2",
+                                  "Adj_Uni"   = "#D55E00",
+                                  "Adj_Biv"   = "#009E73"),
+                       labels = c("Full"      = "Complete Data",
+                                  "Naive_Biv" = "Naive",
+                                  "Adj_Uni"   = "Univariate",
+                                  "Adj_Biv"   = "Bivariate")) +
+    scale_x_continuous(breaks = seq(0, 1, by = 0.2)) +
+    scale_y_continuous(breaks = seq(-0.1, 0.3, by = ybreak)) +
+    coord_cartesian(ylim = ylim_i2) +
+    theme_minimal() +
+    theme(# larger gap between the two selection rows within one I2 block
+          panel.spacing.y = unit(1, "lines"),
+          panel.spacing.x = unit(0.8, "lines"),
+          # smaller gap between the I2 blocks: less top/bottom margin per plot
+          plot.margin = margin(t = 14, r = 10, b = 0, l = 10),
+          axis.title   = element_text(size = 16),
+          legend.position = "bottom",
+          strip.text.x = element_text(size = 16),
+          strip.text.y = element_text(size = 12, angle = 0, hjust = 0.5, vjust = 0.5),
+          legend.text  = element_text(size = 16),
+          legend.title = element_text(size = 16))
+}
 
-ggsave("Plots_Paper/SimStudy_CIWidth.png", width = 10, height = 10)
+i2_levels <- c("0", "30", "60", "90")
+plots_i2  <- lapply(i2_levels, plot_bias_i2)
+
+ggarrange(plotlist = plots_i2,
+          common.legend = TRUE,
+          legend = "bottom",
+          nrow = 4, ncol = 1,
+          labels = paste0(LETTERS[1:4], "  I\u00B2 = ", i2_levels, "%"),
+          hjust = 0,
+          font.label = list(size = 14, face = "bold"),
+          label.y = 1.0)
+
+ggsave("Plots_Paper/SimStudy_Bias.png", width = 10, height = 12)
 ```
 
+```{r, fig.width=10, fig.height=12}
+# check the actual MSE range per I2 level to choose sensible limits
+theta04_plot %>%
+  group_by(I2) %>%
+  summarise(min_MSE = min(MSE, na.rm = TRUE),
+            max_MSE = max(MSE, na.rm = TRUE))
+
+# y-axis limits and tick spacing per I2 level (adjust after checking the table above)
+y_settings <- list("0"  = list(lim = c(0, 0.01), by = 0.01),
+                   "30" = list(lim = c(0, 0.02), by = 0.01),
+                   "60" = list(lim = c(0, 0.03), by = 0.01),
+                   "90" = list(lim = c(0, 0.11), by = 0.05))
+
+plot_MSE_i2 <- function(i2_level, 
+                        data = theta04_plot, 
+                        settings = y_settings) {
+  
+  ylim_i2 <- settings[[i2_level]]$lim
+  ybreak  <- settings[[i2_level]]$by
+  
+  ggplot(filter(data, I2 == i2_level),
+         aes(x = delta_est, y = MSE, color = method)) +
+    geom_line(aes(group = method), linewidth = 1.2) +
+    geom_hline(yintercept = 0, color = "black", linetype = "dashed") +
+    facet_grid(select_type ~ K,
+               labeller = labeller(
+                 K = as_labeller(function(x) paste0("K == ", x),
+                                 default = label_parsed))) +
+    labs(x = expression("Selection Weight"~delta),
+         y = "MSE") +
+    scale_color_manual(name = " ",
+                       values = c("Full"      = "#000000",
+                                  "Naive_Biv" = "#0072B2",
+                                  "Adj_Uni"   = "#D55E00",
+                                  "Adj_Biv"   = "#009E73"),
+                       labels = c("Full"      = "Complete Data",
+                                  "Naive_Biv" = "Naive",
+                                  "Adj_Uni"   = "Univariate",
+                                  "Adj_Biv"   = "Bivariate")) +
+    scale_x_continuous(breaks = seq(0, 1, by = 0.2)) +
+    scale_y_continuous(breaks = seq(-0.1, 0.3, by = ybreak)) +
+    coord_cartesian(ylim = ylim_i2) +
+    theme_minimal() +
+    theme(# larger gap between the two selection rows within one I2 block
+          panel.spacing.y = unit(1, "lines"),
+          panel.spacing.x = unit(0.8, "lines"),
+          # smaller gap between the I2 blocks: less top/bottom margin per plot
+          plot.margin = margin(t = 14, r = 10, b = 0, l = 10),
+          axis.title   = element_text(size = 16),
+          legend.position = "bottom",
+          strip.text.x = element_text(size = 16),
+          strip.text.y = element_text(size = 12, angle = 0, hjust = 0.5, vjust = 0.5),
+          legend.text  = element_text(size = 16),
+          legend.title = element_text(size = 16))
+}
+
+plots_i2  <- lapply(i2_levels, plot_MSE_i2)
+
+ggarrange(plotlist = plots_i2,
+          common.legend = TRUE,
+          legend = "bottom",
+          nrow = 4, ncol = 1,
+          labels = paste0(LETTERS[1:4], "  I\u00B2 = ", i2_levels, "%"),
+          hjust = 0,
+          font.label = list(size = 14, face = "bold"),
+          label.y = 1.01)
+
+ggsave("Plots_Paper/SimStudy_MSE.png", width = 10, height = 12)
+```
+
+```{r, fig.width=10, fig.height=12}
+# check the actual coverage range per I2 level to choose sensible limits
+theta04_plot %>%
+  group_by(I2) %>%
+  summarise(min_Cov = min(Coverage, na.rm = TRUE),
+            max_Cov = max(Coverage, na.rm = TRUE))
+
+# y-axis limits and tick spacing per I2 level (adjust after checking the table above)
+y_settings <- list("0"  = list(lim = c(0.88, 1), by = 0.05),
+                   "30" = list(lim = c(0.82, 1), by = 0.05),
+                   "60" = list(lim = c(0.79, 1), by = 0.05),
+                   "90" = list(lim = c(0.56, 1), by = 0.1))
+
+plot_Cov_i2 <- function(i2_level, 
+                        data = theta04_plot, 
+                        settings = y_settings) {
+  
+  ylim_i2 <- settings[[i2_level]]$lim
+  ybreak  <- settings[[i2_level]]$by
+  
+  ggplot(filter(data, I2 == i2_level),
+         aes(x = delta_est, y = Coverage, color = method)) +
+    geom_line(aes(group = method), linewidth = 1.2) +
+    geom_hline(yintercept = 0.95, color = "black", linetype = "dashed") +
+    facet_grid(select_type ~ K,
+               labeller = labeller(
+                 K = as_labeller(function(x) paste0("K == ", x),
+                                 default = label_parsed))) +
+    labs(x = expression("Selection Weight"~delta),
+         y = "Coverage") +
+    scale_color_manual(name = " ",
+                       values = c("Full"      = "#000000",
+                                  "Naive_Biv" = "#0072B2",
+                                  "Adj_Uni"   = "#D55E00",
+                                  "Adj_Biv"   = "#009E73"),
+                       labels = c("Full"      = "Complete Data",
+                                  "Naive_Biv" = "Naive",
+                                  "Adj_Uni"   = "Univariate",
+                                  "Adj_Biv"   = "Bivariate")) +
+    scale_x_continuous(breaks = seq(0, 1, by = 0.2)) +
+    scale_y_continuous(breaks = seq(0, 1, by = ybreak)) +
+    coord_cartesian(ylim = ylim_i2) +
+    theme_minimal() +
+    theme(# larger gap between the two selection rows within one I2 block
+          panel.spacing.y = unit(1, "lines"),
+          panel.spacing.x = unit(0.8, "lines"),
+          # smaller gap between the I2 blocks: less top/bottom margin per plot
+          plot.margin = margin(t = 14, r = 10, b = 0, l = 10),
+          axis.title   = element_text(size = 16),
+          legend.position = "bottom",
+          strip.text.x = element_text(size = 16),
+          strip.text.y = element_text(size = 12, angle = 0, hjust = 0.5, vjust = 0.5),
+          legend.text  = element_text(size = 16),
+          legend.title = element_text(size = 16))
+}
+
+plots_i2  <- lapply(i2_levels, plot_Cov_i2)
+
+ggarrange(plotlist = plots_i2,
+          common.legend = TRUE,
+          legend = "bottom",
+          nrow = 4, ncol = 1,
+          labels = paste0(LETTERS[1:4], "  I\u00B2 = ", i2_levels, "%"),
+          hjust = 0,
+          font.label = list(size = 14, face = "bold"),
+          label.y = 1.01)
+
+ggsave("Plots_Paper/SimStudy_Coverage.png", width = 10, height = 12)
+```
+
+```{r, fig.width=10, fig.height=12}
+# check the actual CI width range per I2 level to choose sensible limits
+theta04_plot %>%
+  group_by(I2) %>%
+  summarise(min_CI = min(CI_Width, na.rm = TRUE),
+            max_CI = max(CI_Width, na.rm = TRUE))
+
+# y-axis limits and tick spacing per I2 level (adjust after checking the table above)
+y_settings <- list("0"  = list(lim = c(0.16, 0.45), by = 0.05),
+                   "30" = list(lim = c(0.18, 0.5), by = 0.1),
+                   "60" = list(lim = c(0.2, 0.6), by = 0.1),
+                   "90" = list(lim = c(0.4, 1.1), by = 0.2))
+
+plot_CIWidth_i2 <- function(i2_level,
+                            data = theta04_plot, 
+                            settings = y_settings) {
+  
+  ylim_i2 <- settings[[i2_level]]$lim
+  ybreak  <- settings[[i2_level]]$by
+  
+  ggplot(filter(data, I2 == i2_level),
+         aes(x = delta_est, y = CI_Width, color = method)) +
+    geom_line(aes(group = method), linewidth = 1.2) +
+    facet_grid(select_type ~ K,
+               labeller = labeller(
+                 K = as_labeller(function(x) paste0("K == ", x),
+                                 default = label_parsed))) +
+    labs(x = expression("Selection Weight"~delta),
+         y = "CI Width") +
+    scale_color_manual(name = " ",
+                       values = c("Full"      = "#000000",
+                                  "Naive_Biv" = "#0072B2",
+                                  "Adj_Uni"   = "#D55E00",
+                                  "Adj_Biv"   = "#009E73"),
+                       labels = c("Full"      = "Complete Data",
+                                  "Naive_Biv" = "Naive",
+                                  "Adj_Uni"   = "Univariate",
+                                  "Adj_Biv"   = "Bivariate")) +
+    scale_x_continuous(breaks = seq(0, 1, by = 0.2)) +
+    scale_y_continuous(breaks = seq(0, 1.1, by = ybreak)) +
+    coord_cartesian(ylim = ylim_i2) +
+    theme_minimal() +
+    theme(# larger gap between the two selection rows within one I2 block
+          panel.spacing.y = unit(1, "lines"),
+          panel.spacing.x = unit(0.8, "lines"),
+          # smaller gap between the I2 blocks: less top/bottom margin per plot
+          plot.margin = margin(t = 14, r = 10, b = 0, l = 10),
+          axis.title   = element_text(size = 16),
+          legend.position = "bottom",
+          strip.text.x = element_text(size = 16),
+          strip.text.y = element_text(size = 12, angle = 0, hjust = 0.5, vjust = 0.5),
+          legend.text  = element_text(size = 16),
+          legend.title = element_text(size = 16))
+}
+
+plots_i2  <- lapply(i2_levels, plot_CIWidth_i2)
+
+ggarrange(plotlist = plots_i2,
+          common.legend = TRUE,
+          legend = "bottom",
+          nrow = 4, ncol = 1,
+          labels = paste0(LETTERS[1:4], "  I\u00B2 = ", i2_levels, "%"),
+          hjust = 0,
+          font.label = list(size = 14, face = "bold"),
+          label.y = 1.01)
+
+ggsave("Plots_Paper/SimStudy_CIWidth.png", width = 10, height = 12)
+```
 
 ### Analyse numerical stability parameters
 
-```{r}
-stability_summary <- theta04_long %>%
-  group_by(K, tau2_val, select_type) %>%
-  summarise(
-    Mean_Attempts = mean(N_Attempts),
-    Mean_Failure  = mean(Failure_Rate),
-    Mean_Redraws  = mean(Avg_Redraws)
-  )
-print(stability_summary)
+```{r, echo = FALSE}
+stability <- res_simstudy %>%
+  dplyr::select(scenario_idx,
+                K,
+                tau2_val,
+                rho_b,
+                rho_w,
+                delta_sim,
+                p1,
+                select_type,
+                delta_est,
+                
+                Prop_Redrawn,
+                Avg_Redraws,
+                Max_Redraws,
+                
+                Failure_Rate_Full,
+                Failure_Rate_Naive,
+                Failure_Rate_Uni,
+                Failure_Rate_Biv,
+                
+                Mean_Complete_Pairs,
+                Mean_Failed_Imputations_Uni,
+                Mean_Failed_Imputations_Biv)
+
+stability <- stability %>%
+  dplyr::mutate(I2 = dplyr::case_when(tau2_val == 0    ~ 0,
+                                      tau2_val == 0.02 ~ 0.30,
+                                      tau2_val == 0.06 ~ 0.60,
+                                      tau2_val == 0.36 ~ 0.90,
+                                      TRUE ~ NA_real_))
+
+# make sure all variables are numeric
+stability <- stability %>%
+  mutate(across(c(tau2_val, rho_b, rho_w, delta_sim, p1, delta_est,
+                  Avg_Redraws, Prop_Redrawn, Max_Redraws, Failure_Rate_Full, 
+                  Failure_Rate_Naive, Failure_Rate_Uni, Failure_Rate_Biv,
+                  Mean_Complete_Pairs, Mean_Failed_Imputations_Biv,
+                  Mean_Failed_Imputations_Uni), as.numeric))
+
+stability_K_I2 <- stability %>%
+  dplyr::group_by(K, I2) %>%
+  dplyr::summarise(Prop_Redrawn = mean(Prop_Redrawn, na.rm = TRUE),
+                   Avg_Redraws = mean(Avg_Redraws, na.rm = TRUE),
+                   Failure_Full = mean(Failure_Rate_Full, na.rm = TRUE),
+                   Failure_Naive = mean(Failure_Rate_Naive, na.rm = TRUE),
+                   Failure_Uni = mean(Failure_Rate_Uni, na.rm = TRUE),
+                   Failure_Biv = mean(Failure_Rate_Biv, na.rm = TRUE),
+    .groups = "drop")
+
+knitr::kable(stability_K_I2)
 ```
 
-##  theta1 = theta2 = 0.4, rho_B = 0.4, rho_W = 0.4, p_i = 0.2, n_sim = 1900, M = 200, delta_sim = 0.8
+```{r, echo = FALSE}
+ggplot(stability_K_I2, aes(x = I2, y = Prop_Redrawn, group = factor(K),
+                           linetype = factor(K))) +
+  geom_line() +
+  geom_point() +
+  scale_x_continuous(breaks = c(0, 0.3, 0.6, 0.9), 
+                     labels = c("0%", "30%", "60%", "90%")) +
+  labs(x = expression(I^2), y = "Proportion of repetitions requiring redraw",
+       linetype = "Number of studies (K)") +
+  theme_minimal()
+```
 
 
-```{r, echo = FALSE, cache =TRUE}
-res_simstudy_supp  <- read.csv2("Data/data_simulation_supp.csv", sep = ",")
+
+
+###  Repetition-wise deletion theta1 = theta2 = 0.4, rho_B = 0.8, rho_W = 0.8, p_i = 0.2, n_sim = 1900, M = 200, delta_sim = delta_est, variance and tau estimated
+
+
+```{r, fig.width=10, fig.height=12}
+theta04_plot <- theta04_long %>%
+  filter(select_type %in% c("zscore", "effect"),
+         method %in% c("Naive_Common", "Adj_Biv_Common", "Full_Common",
+                       "Adj_Uni_Common")) %>%
+  mutate(select_type = factor(select_type,
+                              levels = c("zscore", "effect"),
+                              labels = c("Selection on\nz-score",
+                                         "Selection on\ntreatment effect")))
+
+# check the actual bias range per I2 level to choose sensible limits
+theta04_plot %>%
+  group_by(I2) %>%
+  summarise(min_bias = min(Bias, na.rm = TRUE),
+            max_bias = max(Bias, na.rm = TRUE))
+
+# y-axis limits and tick spacing per I2 level (adjust after checking the table above)
+y_settings <- list("0"  = list(lim = c(-0.03, 0.04), by = 0.02),
+                   "30" = list(lim = c(-0.03, 0.06), by = 0.02),
+                   "60" = list(lim = c(-0.03, 0.08), by = 0.02),
+                   "90" = list(lim = c(-0.05, 0.22), by = 0.10))
+
+plot_bias_i2_rep <- function(i2_level,
+                             data = theta04_plot,
+                             settings = y_settings) {
+  
+  ylim_i2 <- settings[[i2_level]]$lim
+  ybreak  <- settings[[i2_level]]$by
+  
+  ggplot(filter(data, I2 == i2_level),
+         aes(x = delta_est, y = Bias, color = method)) +
+    geom_line(aes(group = method), linewidth = 1.2) +
+    geom_hline(yintercept = 0, color = "black", linetype = "dashed") +
+    facet_grid(select_type ~ K,
+               labeller = labeller(
+                 K = as_labeller(function(x) paste0("K == ", x),
+                                 default = label_parsed))) +
+    labs(x = expression("Selection Weight"~delta),
+         y = "Bias") +
+    scale_color_manual(name = " ",
+                   values = c("Full_Common"      = "#000000",
+                              "Naive_Common"     = "#0072B2",
+                              "Adj_Uni_Common"   = "#D55E00",
+                              "Adj_Biv_Common"   = "#009E73"),
+                   labels = c("Full_Common"      = "Complete Data",
+                              "Naive_Common"     = "Naive",
+                              "Adj_Uni_Common"   = "Univariate",
+                              "Adj_Biv_Common"   = "Bivariate")) +
+    scale_x_continuous(breaks = seq(0, 1, by = 0.2)) +
+    scale_y_continuous(breaks = seq(-0.1, 0.3, by = ybreak)) +
+    coord_cartesian(ylim = ylim_i2) +
+    theme_minimal() +
+    theme(# larger gap between the two selection rows within one I2 block
+          panel.spacing.y = unit(1, "lines"),
+          panel.spacing.x = unit(0.8, "lines"),
+          # smaller gap between the I2 blocks: less top/bottom margin per plot
+          plot.margin = margin(t = 14, r = 10, b = 0, l = 10),
+          axis.title   = element_text(size = 16),
+          legend.position = "bottom",
+          strip.text.x = element_text(size = 16),
+          strip.text.y = element_text(size = 12, angle = 0, hjust = 0.5, vjust = 0.5),
+          legend.text  = element_text(size = 16),
+          legend.title = element_text(size = 16))
+}
+
+plots_i2  <- lapply(i2_levels, plot_bias_i2_rep)
+
+ggarrange(plotlist = plots_i2,
+          common.legend = TRUE,
+          legend = "bottom",
+          nrow = 4, ncol = 1,
+          labels = paste0(LETTERS[1:4], "  I\u00B2 = ", i2_levels, "%"),
+          hjust = 0,
+          font.label = list(size = 14, face = "bold"),
+          label.y = 1.0)
+
+
+ggsave("Plots_Paper/SimStudy_Bias_RepDel.png", width = 10, height = 12)
+```
+
+```{r, fig.width=10, fig.height=12}
+# check the actual MSE range per I2 level to choose sensible limits
+theta04_plot %>%
+  group_by(I2) %>%
+  summarise(min_MSE = min(MSE, na.rm = TRUE),
+            max_MSE = max(MSE, na.rm = TRUE))
+
+# y-axis limits and tick spacing per I2 level (adjust after checking the table above)
+y_settings <- list("0"  = list(lim = c(0, 0.01), by = 0.01),
+                   "30" = list(lim = c(0, 0.02), by = 0.01),
+                   "60" = list(lim = c(0, 0.03), by = 0.01),
+                   "90" = list(lim = c(0, 0.11), by = 0.05))
+
+plot_MSE_i2_rep <- function(i2_level, 
+                            data = theta04_plot, 
+                            settings = y_settings) {
+  
+  ylim_i2 <- settings[[i2_level]]$lim
+  ybreak  <- settings[[i2_level]]$by
+  
+  ggplot(filter(data, I2 == i2_level),
+         aes(x = delta_est, y = MSE, color = method)) +
+    geom_line(aes(group = method), linewidth = 1.2) +
+    geom_hline(yintercept = 0, color = "black", linetype = "dashed") +
+    facet_grid(select_type ~ K,
+               labeller = labeller(
+                 K = as_labeller(function(x) paste0("K == ", x),
+                                 default = label_parsed))) +
+    labs(x = expression("Selection Weight"~delta),
+         y = "MSE") +
+    scale_color_manual(name = " ",
+                       values = c("Full_Common"      = "#000000",
+                                  "Naive_Common"     = "#0072B2",
+                                  "Adj_Uni_Common"   = "#D55E00",
+                                  "Adj_Biv_Common"   = "#009E73"),
+                       labels = c("Full_Common"      = "Complete Data",
+                                  "Naive_Common"     = "Naive",
+                                  "Adj_Uni_Common"   = "Univariate",
+                                  "Adj_Biv_Common"   = "Bivariate")) +
+    scale_x_continuous(breaks = seq(0, 1, by = 0.2)) +
+    scale_y_continuous(breaks = seq(-0.1, 0.3, by = ybreak)) +
+    coord_cartesian(ylim = ylim_i2) +
+    theme_minimal() +
+    theme(# larger gap between the two selection rows within one I2 block
+          panel.spacing.y = unit(1, "lines"),
+          panel.spacing.x = unit(0.8, "lines"),
+          # smaller gap between the I2 blocks: less top/bottom margin per plot
+          plot.margin = margin(t = 14, r = 10, b = 0, l = 10),
+          axis.title   = element_text(size = 16),
+          legend.position = "bottom",
+          strip.text.x = element_text(size = 16),
+          strip.text.y = element_text(size = 12, angle = 0, hjust = 0.5, vjust = 0.5),
+          legend.text  = element_text(size = 16),
+          legend.title = element_text(size = 16))
+}
+
+plots_i2  <- lapply(i2_levels, plot_MSE_i2_rep)
+
+ggarrange(plotlist = plots_i2,
+          common.legend = TRUE,
+          legend = "bottom",
+          nrow = 4, ncol = 1,
+          labels = paste0(LETTERS[1:4], "  I\u00B2 = ", i2_levels, "%"),
+          hjust = 0,
+          font.label = list(size = 14, face = "bold"),
+          label.y = 1.01)
+
+ggsave("Plots_Paper/SimStudy_MSE_RepDel.png", width = 10, height = 12)
+```
+
+```{r, fig.width=10, fig.height=12}
+# check the actual coverage range per I2 level to choose sensible limits
+theta04_plot %>%
+  group_by(I2) %>%
+  summarise(min_Cov = min(Coverage, na.rm = TRUE),
+            max_Cov = max(Coverage, na.rm = TRUE))
+
+# y-axis limits and tick spacing per I2 level (adjust after checking the table above)
+y_settings <- list("0"  = list(lim = c(0.88, 1), by = 0.05),
+                   "30" = list(lim = c(0.82, 1), by = 0.05),
+                   "60" = list(lim = c(0.79, 1), by = 0.05),
+                   "90" = list(lim = c(0.56, 1), by = 0.1))
+
+plot_Cov_i2_Rep <- function(i2_level, 
+                            data = theta04_plot, 
+                            settings = y_settings) {
+  
+  ylim_i2 <- settings[[i2_level]]$lim
+  ybreak  <- settings[[i2_level]]$by
+  
+  ggplot(filter(data, I2 == i2_level),
+         aes(x = delta_est, y = Coverage, color = method)) +
+    geom_line(aes(group = method), linewidth = 1.2) +
+    geom_hline(yintercept = 0.95, color = "black", linetype = "dashed") +
+    facet_grid(select_type ~ K,
+               labeller = labeller(
+                 K = as_labeller(function(x) paste0("K == ", x),
+                                 default = label_parsed))) +
+    labs(x = expression("Selection Weight"~delta),
+         y = "Coverage") +
+   scale_color_manual(name = " ",
+                      values = c("Full_Common"      = "#000000",
+                                 "Naive_Common"     = "#0072B2",
+                                 "Adj_Uni_Common"   = "#D55E00",
+                                 "Adj_Biv_Common"   = "#009E73"),
+                      labels = c("Full_Common"      = "Complete Data",
+                                 "Naive_Common"     = "Naive",
+                                 "Adj_Uni_Common"   = "Univariate",
+                                 "Adj_Biv_Common"   = "Bivariate")) +
+    scale_x_continuous(breaks = seq(0, 1, by = 0.2)) +
+    scale_y_continuous(breaks = seq(0, 1, by = ybreak)) +
+    coord_cartesian(ylim = ylim_i2) +
+    theme_minimal() +
+    theme(# larger gap between the two selection rows within one I2 block
+          panel.spacing.y = unit(1, "lines"),
+          panel.spacing.x = unit(0.8, "lines"),
+          # smaller gap between the I2 blocks: less top/bottom margin per plot
+          plot.margin = margin(t = 14, r = 10, b = 0, l = 10),
+          axis.title   = element_text(size = 16),
+          legend.position = "bottom",
+          strip.text.x = element_text(size = 16),
+          strip.text.y = element_text(size = 12, angle = 0, hjust = 0.5, vjust = 0.5),
+          legend.text  = element_text(size = 16),
+          legend.title = element_text(size = 16))
+}
+
+plots_i2  <- lapply(i2_levels, plot_Cov_i2_Rep)
+
+ggarrange(plotlist = plots_i2,
+          common.legend = TRUE,
+          legend = "bottom",
+          nrow = 4, ncol = 1,
+          labels = paste0(LETTERS[1:4], "  I\u00B2 = ", i2_levels, "%"),
+          hjust = 0,
+          font.label = list(size = 14, face = "bold"),
+          label.y = 1.01)
+
+ggsave("Plots_Paper/SimStudy_Coverage_RepDel.png", width = 10, height = 12)
+```
+
+```{r, fig.width=10, fig.height=12}
+# check the actual CI width range per I2 level to choose sensible limits
+theta04_plot %>%
+  group_by(I2) %>%
+  summarise(min_CI = min(CI_Width, na.rm = TRUE),
+            max_CI = max(CI_Width, na.rm = TRUE))
+
+# y-axis limits and tick spacing per I2 level (adjust after checking the table above)
+y_settings <- list("0"  = list(lim = c(0.15, 0.45), by = 0.05),
+                   "30" = list(lim = c(0.15, 0.5), by = 0.05),
+                   "60" = list(lim = c(0.2, 0.6), by = 0.1),
+                   "90" = list(lim = c(0.4, 1.1), by = 0.2))
+
+plot_CIWidth_i2_rep <- function(i2_level,
+                                data = theta04_plot, 
+                                settings = y_settings) {
+  
+  ylim_i2 <- settings[[i2_level]]$lim
+  ybreak  <- settings[[i2_level]]$by
+  
+  ggplot(filter(data, I2 == i2_level),
+         aes(x = delta_est, y = CI_Width, color = method)) +
+    geom_line(aes(group = method), linewidth = 1.2) +
+    facet_grid(select_type ~ K,
+               labeller = labeller(
+                 K = as_labeller(function(x) paste0("K == ", x),
+                                 default = label_parsed))) +
+    labs(x = expression("Selection Weight"~delta),
+         y = "CI Width") +
+    scale_color_manual(name = " ",
+                       values = c("Full_Common"      = "#000000",
+                                  "Naive_Common"     = "#0072B2",
+                                  "Adj_Uni_Common"   = "#D55E00",
+                                  "Adj_Biv_Common"   = "#009E73"),
+                       labels = c("Full_Common"      = "Complete Data",
+                                  "Naive_Common"     = "Naive",
+                                  "Adj_Uni_Common"   = "Univariate",
+                                  "Adj_Biv_Common"   = "Bivariate")) +
+    scale_x_continuous(breaks = seq(0, 1, by = 0.2)) +
+    scale_y_continuous(breaks = seq(0, 1.1, by = ybreak)) +
+    coord_cartesian(ylim = ylim_i2) +
+    theme_minimal() +
+    theme(# larger gap between the two selection rows within one I2 block
+          panel.spacing.y = unit(1, "lines"),
+          panel.spacing.x = unit(0.8, "lines"),
+          # smaller gap between the I2 blocks: less top/bottom margin per plot
+          plot.margin = margin(t = 14, r = 10, b = 0, l = 10),
+          axis.title   = element_text(size = 16),
+          legend.position = "bottom",
+          strip.text.x = element_text(size = 16),
+          strip.text.y = element_text(size = 12, angle = 0, hjust = 0.5, vjust = 0.5),
+          legend.text  = element_text(size = 16),
+          legend.title = element_text(size = 16))
+}
+
+plots_i2  <- lapply(i2_levels, plot_CIWidth_i2_rep)
+
+ggarrange(plotlist = plots_i2,
+          common.legend = TRUE,
+          legend = "bottom",
+          nrow = 4, ncol = 1,
+          labels = paste0(LETTERS[1:4], "  I\u00B2 = ", i2_levels, "%"),
+          hjust = 0,
+          font.label = list(size = 14, face = "bold"),
+          label.y = 1.01)
+
+ggsave("Plots_Paper/SimStudy_CIWidth_RepDel.png", width = 10, height = 12)
+```
+
+
+#### Analyse numerical stability parameters
+
+```{r, echo = FALSE}
+repetition_wise <- res_simstudy %>%
+  dplyr::select(scenario_idx,
+                K,
+                tau2_val,
+                rho_b,
+                rho_w,
+                delta_sim,
+                p1,
+                select_type,
+                delta_est,
+                
+                N_Eligible,
+                N_Common,
+                Prop_Common)
+
+repetition_wise <- repetition_wise %>%
+  dplyr::mutate(I2 = dplyr::case_when(tau2_val == 0    ~ 0,
+                                      tau2_val == 0.02 ~ 0.30,
+                                      tau2_val == 0.06 ~ 0.60,
+                                      tau2_val == 0.36 ~ 0.90,
+                                      TRUE ~ NA_real_),
+                Attrition_Rate = 1 - as.numeric(Prop_Common))
+
+repetition_wise <- repetition_wise %>%
+  mutate(across(c(tau2_val, rho_b, rho_w, delta_sim, p1, delta_est,
+                  N_Eligible, N_Common, Prop_Common, Attrition_Rate), as.numeric))
+
+repetition_wise_K_I2 <- repetition_wise %>%
+  dplyr::group_by(K, I2) %>%
+  dplyr::summarise(Mean_N_Common      = mean(N_Common, na.rm = TRUE),
+                  Mean_Prop_Common    = mean(Prop_Common, na.rm = TRUE),
+                  Mean_Attrition_Rate = mean(Attrition_Rate, na.rm = TRUE),
+                  .groups = "drop")
+
+knitr::kable(repetition_wise_K_I2)
+```
+
+##  theta1 = theta2 = 0.4, rho_B = 0.8, rho_W = 0.8, p_i = 0.4, n_sim = 1900, M = 200, delta_sim = delta_est, variance and tau estimated
+
+```{r}
+res_simstudy <- read.csv2("Data/Sim_summary/data_simulation_main_high_prop_2026-10-10.csv", sep = ",")
 
 # turn data into long format for simulation parameters
-theta04_long <- res_simstudy_supp %>%
-  pivot_longer(
-    cols = matches("^(Bias|MSE|Coverage|CI_Width)_"), 
-    names_to = c(".value", "method"),
-    names_pattern = "^(Bias|MSE|Coverage|CI_Width)_(.*)"
-  )
+theta04_long <- res_simstudy %>%
+  pivot_longer(cols = matches("^(Bias|MSE|Coverage|CI_Width)_"), 
+               names_to = c(".value", "method"),
+               names_pattern = "^(Bias|MSE|Coverage|CI_Width)_(.*)")
+
+# add I2 variable
+theta04_long <- theta04_long %>%
+  mutate(I2 = case_when(tau2_val == 0.00 ~ "0",
+                        tau2_val == 0.02 ~ "30",
+                        tau2_val == 0.06 ~ "60",
+                        tau2_val == 0.36 ~ "90",
+                        TRUE             ~ NA_character_))
 
 # make sure all variables are numeric
 theta04_long <- theta04_long %>%
-  mutate(across(c(K, theta_1, theta_2, tau2_val, rho_b, rho_w, delta_sim, p1, delta_est, Avg_Redraws, Bias, MSE, Coverage, CI_Width, Failure_Rate, Avg_Redraws), as.numeric))
+  mutate(across(c(K, theta_1, theta_2, tau2_val, rho_b, rho_w, delta_sim, p1, delta_est,
+                  Avg_Redraws, Bias, MSE, Coverage, CI_Width, I2), as.numeric))
+
+```
+
+
+```{r, fig.width=10, fig.height=12}
+theta04_plot <- theta04_long %>%
+  filter(select_type %in% c("zscore", "effect"),
+         method %in% c("Naive_Biv", "Adj_Biv", "Full", "Adj_Uni")) %>%
+  mutate(select_type = factor(select_type,
+                              levels = c("zscore", "effect"),
+                              labels = c("Selection on\nz-score",
+                                         "Selection on\ntreatment effect")))
+
+# check the actual bias range per I2 level to choose sensible limits
+theta04_plot %>%
+  group_by(I2) %>%
+  summarise(min_bias = min(Bias, na.rm = TRUE),
+            max_bias = max(Bias, na.rm = TRUE))
+
+# y-axis limits and tick spacing per I2 level (adjust after checking the table above)
+y_settings <- list("0"  = list(lim = c(-0.04, 0.08), by = 0.04),
+                   "30" = list(lim = c(-0.03, 0.09), by = 0.04),
+                   "60" = list(lim = c(-0.03, 0.12), by = 0.04),
+                   "90" = list(lim = c(-0.04, 0.29), by = 0.10))
+
+plots_i2  <- lapply(i2_levels, plot_bias_i2)
+
+ggarrange(plotlist = plots_i2,
+          common.legend = TRUE,
+          legend = "bottom",
+          nrow = 4, ncol = 1,
+          labels = paste0(LETTERS[1:4], "  I\u00B2 = ", i2_levels, "%"),
+          hjust = 0,
+          font.label = list(size = 14, face = "bold"),
+          label.y = 1.0)
+
+ggsave("Plots_Paper/Supp_SimStudy_Bias_p04.png", width = 10, height = 12)
+```
+
+
+```{r, fig.width=10, fig.height=12}
+# check the actual MSE range per I2 level to choose sensible limits
+theta04_plot %>%
+  group_by(I2) %>%
+  summarise(min_MSE = min(MSE, na.rm = TRUE),
+            max_MSE = max(MSE, na.rm = TRUE))
+
+# y-axis limits and tick spacing per I2 level (adjust after checking the table above)
+y_settings <- list("0"  = list(lim = c(0, 0.015), by = 0.01),
+                   "30" = list(lim = c(0, 0.02), by = 0.01),
+                   "60" = list(lim = c(0, 0.03), by = 0.01),
+                   "90" = list(lim = c(0, 0.14), by = 0.05))
+
+plots_i2  <- lapply(i2_levels, plot_MSE_i2)
+
+ggarrange(plotlist = plots_i2,
+          common.legend = TRUE,
+          legend = "bottom",
+          nrow = 4, ncol = 1,
+          labels = paste0(LETTERS[1:4], "  I\u00B2 = ", i2_levels, "%"),
+          hjust = 0,
+          font.label = list(size = 14, face = "bold"),
+          label.y = 1.01)
+
+ggsave("Plots_Paper/Supp_SimStudy_MSE_p04.png", width = 10, height = 12)
+```
+
+
+```{r, fig.width=10, fig.height=12}
+# check the actual coverage range per I2 level to choose sensible limits
+theta04_plot %>%
+  group_by(I2) %>%
+  summarise(min_Cov = min(Coverage, na.rm = TRUE),
+            max_Cov = max(Coverage, na.rm = TRUE))
+
+# y-axis limits and tick spacing per I2 level (adjust after checking the table above)
+y_settings <- list("0"  = list(lim = c(0.78, 1), by = 0.1),
+                   "30" = list(lim = c(0.67, 1), by = 0.1),
+                   "60" = list(lim = c(0.59, 1), by = 0.1),
+                   "90" = list(lim = c(0.32, 1), by = 0.2))
+
+plots_i2  <- lapply(i2_levels, plot_Cov_i2)
+
+ggarrange(plotlist = plots_i2,
+          common.legend = TRUE,
+          legend = "bottom",
+          nrow = 4, ncol = 1,
+          labels = paste0(LETTERS[1:4], "  I\u00B2 = ", i2_levels, "%"),
+          hjust = 0,
+          font.label = list(size = 14, face = "bold"),
+          label.y = 1.01)
+
+ggsave("Plots_Paper/Supp_SimStudy_Coverage_p04.png", width = 10, height = 12)
+```
+
+
+```{r, fig.width=10, fig.height=12}
+# check the actual CI width range per I2 level to choose sensible limits
+theta04_plot %>%
+  group_by(I2) %>%
+  summarise(min_CI = min(CI_Width, na.rm = TRUE),
+            max_CI = max(CI_Width, na.rm = TRUE))
+
+# y-axis limits and tick spacing per I2 level (adjust after checking the table above)
+y_settings <- list("0"  = list(lim = c(0.16, 0.45), by = 0.1),
+                   "30" = list(lim = c(0.18, 0.50), by = 0.1),
+                   "60" = list(lim = c(0.21, 0.60), by = 0.1),
+                   "90" = list(lim = c(0.37, 1.12), by = 0.2))
+
+plots_i2  <- lapply(i2_levels, plot_CIWidth_i2)
+
+ggarrange(plotlist = plots_i2,
+          common.legend = TRUE,
+          legend = "bottom",
+          nrow = 4, ncol = 1,
+          labels = paste0(LETTERS[1:4], "  I\u00B2 = ", i2_levels, "%"),
+          hjust = 0,
+          font.label = list(size = 14, face = "bold"),
+          label.y = 1.01)
+
+ggsave("Plots_Paper/Supp_SimStudy_CIWidth_p04.png", width = 10, height = 12)
+```
+
+
+### Analyse numerical stability parameters
+
+```{r}
+stability <- res_simstudy %>%
+  dplyr::select(scenario_idx,
+                K,
+                tau2_val,
+                rho_b,
+                rho_w,
+                delta_sim,
+                p1,
+                select_type,
+                delta_est,
+                
+                Prop_Redrawn,
+                Avg_Redraws,
+                Max_Redraws,
+                
+                Failure_Rate_Full,
+                Failure_Rate_Naive,
+                Failure_Rate_Uni,
+                Failure_Rate_Biv,
+                
+                Mean_Complete_Pairs,
+                Mean_Failed_Imputations_Uni,
+                Mean_Failed_Imputations_Biv)
+
+stability <- stability %>%
+  dplyr::mutate(I2 = dplyr::case_when(tau2_val == 0    ~ 0,
+                                      tau2_val == 0.02 ~ 0.30,
+                                      tau2_val == 0.06 ~ 0.60,
+                                      tau2_val == 0.36 ~ 0.90,
+                                      TRUE ~ NA_real_))
+
+# make sure all variables are numeric
+stability <- stability %>%
+  mutate(across(c(tau2_val, rho_b, rho_w, delta_sim, p1, delta_est,
+                  Avg_Redraws, Prop_Redrawn, Max_Redraws, Failure_Rate_Full, 
+                  Failure_Rate_Naive, Failure_Rate_Uni, Failure_Rate_Biv,
+                  Mean_Complete_Pairs, Mean_Failed_Imputations_Biv,
+                  Mean_Failed_Imputations_Uni), as.numeric))
+
+stability_K_I2 <- stability %>%
+  dplyr::group_by(K, I2) %>%
+  dplyr::summarise(Prop_Redrawn = mean(Prop_Redrawn, na.rm = TRUE),
+                   Avg_Redraws = mean(Avg_Redraws, na.rm = TRUE),
+                   Failure_Full = mean(Failure_Rate_Full, na.rm = TRUE),
+                   Failure_Naive = mean(Failure_Rate_Naive, na.rm = TRUE),
+                   Failure_Uni = mean(Failure_Rate_Uni, na.rm = TRUE),
+                   Failure_Biv = mean(Failure_Rate_Biv, na.rm = TRUE),
+    .groups = "drop")
+
+knitr::kable(stability_K_I2)
+```
+
+```{r}
+ggplot(stability_K_I2, aes(x = I2, y = Prop_Redrawn, group = factor(K),
+                           linetype = factor(K))) +
+  geom_line() +
+  geom_point() +
+  scale_x_continuous(breaks = c(0, 0.3, 0.6, 0.9),
+                     labels = c("0%", "30%", "60%", "90%")) +
+  labs(x = expression(I^2), y = "Proportion of repetitions requiring redraw",
+       linetype = "Number of studies (K)") +
+  theme_minimal()
+```
+
+### Check truncation of p1
+
+```{r}
+truncation <- res_simstudy %>%
+  dplyr::select(scenario_idx,
+                K,
+                tau2_val,
+                p1,
+                Mean_Missing_Rate_All_Attempts,
+                Mean_Missing_Rate_Accepted)
+
+truncation <- truncation %>%
+  dplyr::mutate(I2 = dplyr::case_when(tau2_val == 0    ~ 0,
+                                      tau2_val == 0.02 ~ 0.30,
+                                      tau2_val == 0.06 ~ 0.60,
+                                      tau2_val == 0.36 ~ 0.90,
+                                      TRUE ~ NA_real_))
+
+truncation <- type.convert(truncation, as.is = TRUE)
+
+truncation <- truncation %>%
+  dplyr::group_by(K, I2)  %>%
+  dplyr::summarise(Mean_Mis_All_Attempts = mean(Mean_Missing_Rate_All_Attempts, 
+                                                na.rm = TRUE),
+                   Mean_Mis__Acc = mean(Mean_Missing_Rate_Accepted, na.rm = TRUE),
+                   .groups = "drop")
+
+knitr::kable(truncation)
+```
+
+
+##  theta1 = theta2 = 0.4, rho_B = rho_w = 0, p_i = 0.2, n_sim = 1900, M = 200
+
+```{r}
+res_simstudy  <- read.csv2("Data/Sim_summary/data_simulation_global_correlation_2026-09-23.csv", sep = ",")
+
+# turn data into long format for simulation parameters
+theta04_long <- res_simstudy %>%
+  pivot_longer(cols = matches("^(Bias|MSE|Coverage|CI_Width)_"), 
+               names_to = c(".value", "method"),
+               names_pattern = "^(Bias|MSE|Coverage|CI_Width)_(.*)")
 
 # add I2 variable
 theta04_long <- theta04_long %>%
-  mutate(I2 = case_when(
-    tau2_val == 0.00 ~ "0",
-    tau2_val == 0.02 ~ "30",
-    tau2_val == 0.06 ~ "60",
-    tau2_val == 0.36 ~ "90",
-    TRUE             ~ NA_character_  # Catches any unexpected values safely
-  ))
+  mutate(I2 = case_when(tau2_val == 0.00 ~ "0",
+                        tau2_val == 0.02 ~ "30",
+                        tau2_val == 0.06 ~ "60",
+                        tau2_val == 0.36 ~ "90",
+                        TRUE             ~ NA_character_))
 
+# make sure all variables are numeric
+theta04_long <- theta04_long %>%
+  mutate(across(c(K, theta_1, theta_2, tau2_val, rho_b, rho_w, delta_sim, p1, delta_est,                      Bias, MSE, Coverage, CI_Width, I2), as.numeric))
 ```
 
 
+```{r, fig.width=10, fig.height=12}
+theta04_plot <- theta04_long %>%
+  filter(select_type %in% c("zscore", "effect"),
+         method %in% c("Naive_Biv", "Adj_Biv", "Full", "Adj_Uni"),
+         p1 == "0.2") %>%
+  mutate(select_type = factor(select_type,
+                              levels = c("zscore", "effect"),
+                              labels = c("Selection on\nz-score",
+                                         "Selection on\ntreatment effect")))
 
-plot bias
+# check the actual bias range per I2 level to choose sensible limits
+theta04_plot %>%
+  group_by(I2) %>%
+  summarise(min_bias = min(Bias, na.rm = TRUE),
+            max_bias = max(Bias, na.rm = TRUE))
 
+# y-axis limits and tick spacing per I2 level (adjust after checking the table above)
+y_settings <- list("0"  = list(lim = c(-0.03, 0.05), by = 0.02),
+                   "30" = list(lim = c(-0.03, 0.06), by = 0.02),
+                   "60" = list(lim = c(-0.04, 0.12), by = 0.08),
+                   "90" = list(lim = c(-0.05, 0.22), by = 0.10))
 
-```{r, echo = FALSE, fig.width=10, fig.height=10}
+plots_i2  <- lapply(i2_levels, plot_bias_i2)
 
-theta04_long1 <- subset(theta04_long, select_type == "zscore")
-theta04_long2 <- subset(theta04_long, select_type == "effect")
+ggarrange(plotlist = plots_i2,
+          common.legend = TRUE,
+          legend = "bottom",
+          nrow = 4, ncol = 1,
+          labels = paste0(LETTERS[1:4], "  I\u00B2 = ", i2_levels, "%"),
+          hjust = 0,
+          font.label = list(size = 14, face = "bold"),
+          label.y = 1.0)
 
-range(theta04_long1$Bias, theta04_long2$Bias, na.rm = TRUE)
-
-plot_A <- ggplot(theta04_long1, aes(x = delta_est, y = Bias, color = as.factor(method))) +
-  geom_line(aes(group = method), linewidth = 1.2) +
-   geom_hline(aes(yintercept = 0), color = "black", linetype = "dashed") +
-  facet_grid(I2 ~ K,
-           labeller = labeller(
-             K = as_labeller(function(x) paste0("K == ", x), 
-                               default = label_parsed),
-            I2 = as_labeller(function(x) paste0("I^2 == ", x, "*'%'"), 
-                                default = label_parsed) # or label_both if you want 'tau^2 = 0'
-           )) +
-  labs(x = expression("Selection Weight"~delta),
-       y = "Bias",
-       color = "Method type") +
-  scale_color_manual(name = " ",
-                     values = c("Naive_Biv" = "lightblue1", 
-                                "Adj_Biv" = "hotpink3", 
-                                 "Full" = "navy", 
-                                "Adj_Uni" = "thistle"),
-                      labels = c("Naive_Biv" = "Naive",
-                                 "Full" = "Complete Data",
-                                 "Adj_Biv" = "Bivariate",
-                                 "Adj_Uni" = "Univariate")) +
-  scale_x_continuous(breaks = seq(0, 1, by = 0.2)) +
-  scale_y_continuous(limits = c(-0.15, 0.2), breaks = seq(-0.1, 0.2, by = 0.1)) +
-  theme_minimal() +
-    theme(  
-      plot.margin = margin(20, 10, 10, 10),
-      plot.title = element_text(size = 16, hjust = 0.5), 
-      axis.title = element_text(size = 16), 
-      legend.position = "bottom",
-      strip.text.x = element_text(size = 16),
-      strip.text.y = element_text(size = 14, angle = 0, hjust = 0.5, vjust = 0.5),
-      legend.text = element_text(size = 16),
-      legend.title = element_text(size = 16))
-
-plot_B <-  ggplot(theta04_long2, aes(x = delta_est, y = Bias, color = as.factor(method))) +
-  geom_line(aes(group = method), linewidth = 1.2) +
-   geom_hline(aes(yintercept = 0), color = "black", linetype = "dashed") +
-   facet_grid(I2 ~ K,
-           labeller = labeller(
-             K = as_labeller(function(x) paste0("K == ", x),  
-                               default = label_parsed),
-            I2 = as_labeller(function(x) paste0("I^2 == ", x, "*'%'"), 
-                                default = label_parsed) # or label_both if you want 'tau^2 = 0'
-           )) +
-  labs(x = expression("Selection Weight"~delta),
-       y = "Bias",
-       color = "Method type") +
-    scale_color_manual(name = " ",
-                     values = c("Naive_Biv" = "lightblue1", 
-                                "Adj_Biv" = "hotpink3", 
-                                 "Full" = "navy", 
-                                "Adj_Uni" = "thistle"),
-                      labels = c("Naive_Biv" = "Naive",
-                                 "Full" = "Complete Data",
-                                 "Adj_Biv" = "Bivariate",
-                                 "Adj_Uni" = "Univariate")) +
-  scale_x_continuous(breaks = seq(0, 1, by = 0.2)) +
-  scale_y_continuous(limits = c(-0.15, 0.2), breaks = seq(-0.1, 0.2, by = 0.1)) +
-  theme_minimal() +
-    theme( 
-      plot.margin = margin(20, 10, 10, 10),
-      plot.title = element_text(size = 16, hjust = 0.5), 
-      axis.title = element_text(size = 16), 
-      legend.position = "bottom",
-      strip.text.x = element_text(size = 16),
-      strip.text.y = element_text(size = 14, angle = 0, hjust = 0.5, vjust = 0.5),
-      legend.text = element_text(size = 16),
-      legend.title = element_text(size = 16))
-
-ggarrange(
-  plot_A,
-  plot_B,
-  common.legend = TRUE,
-  legend = "bottom",
-  nrow = 2,
-  labels = c("A Selection on z-score", "B Selection on treatment effect"),
-  hjust = 0,
-  font.label = list(size = 16, face = "bold"),
-  label.y = 1.01,
-  heights = c(1, 1.1)
-)
-
-ggsave("Plots_Paper/Supp_SimStudy_Bias.png", width = 10, height = 10)
+ggsave("Plots_Paper/Supp_SimStudy_Bias_rho0.png", width = 10, height = 12)
 ```
 
 
-plot MSE
+```{r, fig.width=10, fig.height=12}
+# check the actual MSE range per I2 level to choose sensible limits
+theta04_plot %>%
+  group_by(I2) %>%
+  summarise(min_MSE = min(MSE, na.rm = TRUE),
+            max_MSE = max(MSE, na.rm = TRUE))
 
-```{r, echo = FALSE, fig.width=10, fig.height=10}
+# y-axis limits and tick spacing per I2 level (adjust after checking the table above)
+y_settings <- list("0"  = list(lim = c(0, 0.015), by = 0.01),
+                   "30" = list(lim = c(0, 0.02), by = 0.01),
+                   "60" = list(lim = c(0, 0.03), by = 0.01),
+                   "90" = list(lim = c(0, 0.11), by = 0.05))
 
-plot_A <- ggplot(theta04_long1, aes(x = delta_est, y = MSE, color = as.factor(method))) +
-  geom_line(aes(group = method), linewidth = 1.2) +
-  facet_grid(I2 ~ K,
-           labeller = labeller(
-             K = as_labeller(function(x) paste0("K == ", x), 
-                               default = label_parsed),
-            I2 = as_labeller(function(x) paste0("I^2 == ", x, "*'%'"), 
-                                default = label_parsed) # or label_both if you want 'tau^2 = 0'
-           )) +
-  labs(x = expression("Selection Weight"~delta),
-       y = "MSE",
-       color = "Method type") +
-  scale_color_manual(name = " ",
-                     values = c("Naive_Biv" = "lightblue1", 
-                                "Adj_Biv" = "hotpink3", 
-                                 "Full" = "navy", 
-                                "Adj_Uni" = "thistle"),
-                      labels = c("Naive_Biv" = "Naive",
-                                 "Full" = "Complete Data",
-                                 "Adj_Biv" = "Bivariate",
-                                 "Adj_Uni" = "Univariate")) +
-  scale_x_continuous(breaks = seq(0, 1, by = 0.2)) +
-  theme_minimal() +
-    theme(  
-      plot.margin = margin(20, 10, 10, 10),
-      plot.title = element_text(size = 16, hjust = 0.5), 
-      axis.title = element_text(size = 16), 
-      legend.position = "bottom",
-      strip.text.x = element_text(size = 16),
-      strip.text.y = element_text(size = 14, angle = 0, hjust = 0.5, vjust = 0.5),
-      legend.text = element_text(size = 16),
-      legend.title = element_text(size = 16))
+plots_i2  <- lapply(i2_levels, plot_MSE_i2)
 
-plot_B <-  ggplot(theta04_long2, aes(x = delta_est, y = MSE, color = as.factor(method))) +
-  geom_line(aes(group = method), linewidth = 1.2) +
-   facet_grid(I2 ~ K,
-           labeller = labeller(
-             K = as_labeller(function(x) paste0("K == ", x),  
-                               default = label_parsed),
-            I2 = as_labeller(function(x) paste0("I^2 == ", x, "*'%'"), 
-                                default = label_parsed) # or label_both if you want 'tau^2 = 0'
-           )) +
-  labs(x = expression("Selection Weight"~delta),
-       y = "MSE",
-       color = "Method type") +
-    scale_color_manual(name = " ",
-                     values = c("Naive_Biv" = "lightblue1", 
-                                "Adj_Biv" = "hotpink3", 
-                                 "Full" = "navy", 
-                                "Adj_Uni" = "thistle"),
-                      labels = c("Naive_Biv" = "Naive",
-                                 "Full" = "Complete Data",
-                                 "Adj_Biv" = "Bivariate",
-                                 "Adj_Uni" = "Univariate")) +
-  scale_x_continuous(breaks = seq(0, 1, by = 0.2)) +
-  scale_y_continuous(limits = c(0, 0.1), breaks = seq(0, 0.1, by = 0.025)) +
-  theme_minimal() +
-    theme(  
-      plot.margin = margin(20, 10, 10, 10),
-      plot.title = element_text(size = 16, hjust = 0.5), 
-      axis.title = element_text(size = 16), 
-      legend.position = "bottom",
-      strip.text.x = element_text(size = 16),
-      strip.text.y = element_text(size = 14, angle = 0, hjust = 0.5, vjust = 0.5),
-      legend.text = element_text(size = 16),
-      legend.title = element_text(size = 16))
+ggarrange(plotlist = plots_i2,
+          common.legend = TRUE,
+          legend = "bottom",
+          nrow = 4, ncol = 1,
+          labels = paste0(LETTERS[1:4], "  I\u00B2 = ", i2_levels, "%"),
+          hjust = 0,
+          font.label = list(size = 14, face = "bold"),
+          label.y = 1.01)
 
-ggarrange(
-  plot_A,
-  plot_B,
-  common.legend = TRUE,
-  legend = "bottom",
-  nrow = 2,
-  labels = c("A Selection on z-score", "B Selection on treatment effect"),
-  hjust = 0,
-  font.label = list(size = 16, face = "bold"),
-  label.y = 1.01,
-  heights = c(1, 1.1)
-)
-
-ggsave("Plots_Paper/Supp_SimStudy_MSE.png", width = 10, height = 10)
+ggsave("Plots_Paper/Supp_SimStudy_MSE_rho0.png", width = 10, height = 12)
 ```
 
-Coverage
 
+```{r, fig.width=10, fig.height=12}
+# check the actual coverage range per I2 level to choose sensible limits
+theta04_plot %>%
+  group_by(I2) %>%
+  summarise(min_Cov = min(Coverage, na.rm = TRUE),
+            max_Cov = max(Coverage, na.rm = TRUE))
 
-```{r, echo = FALSE, fig.width=10, fig.height=10}
-range(theta04_long1$Coverage, theta04_long2$Coverage, na.rm = TRUE)
+# y-axis limits and tick spacing per I2 level (adjust after checking the table above)
+y_settings <- list("0"  = list(lim = c(0.88, 1), by = 0.1),
+                   "30" = list(lim = c(0.82, 1), by = 0.1),
+                   "60" = list(lim = c(0.79, 1), by = 0.1),
+                   "90" = list(lim = c(0.54, 1), by = 0.2))
 
+plots_i2  <- lapply(i2_levels, plot_Cov_i2)
 
-plot_A <- ggplot(theta04_long1, aes(x = delta_est, y = Coverage, color = as.factor(method))) +
-  geom_line(aes(group = method), linewidth = 1.2) +
-  geom_hline(aes(yintercept = 0.95), color = "black", linetype = "dashed") +
-  facet_grid(I2 ~ K,
-           labeller = labeller(
-             K = as_labeller(function(x) paste0("K == ", x), 
-                               default = label_parsed),
-            I2 = as_labeller(function(x) paste0("I^2 == ", x, "*'%'"), 
-                                default = label_parsed) # or label_both if you want 'tau^2 = 0'
-           )) +
-  labs(x = expression("Selection Weight"~delta),
-       y = "Coverage",
-       color = "Method type") +
-  scale_color_manual(name = " ",
-                     values = c("Naive_Biv" = "lightblue1", 
-                                "Adj_Biv" = "hotpink3", 
-                                 "Full" = "navy", 
-                                "Adj_Uni" = "thistle"),
-                      labels = c("Naive_Biv" = "Naive",
-                                 "Full" = "Complete Data",
-                                 "Adj_Biv" = "Bivariate",
-                                 "Adj_Uni" = "Univariate")) +
-  scale_x_continuous(breaks = seq(0, 1, by = 0.2)) +
-  scale_y_continuous(limits = c(0.63, 1), breaks = seq(0.7, 1, by = 0.1)) +
-  theme_minimal() +
-    theme(  
-      plot.margin = margin(20, 10, 10, 10),
-      plot.title = element_text(size = 16, hjust = 0.5), 
-      axis.title = element_text(size = 16), 
-      legend.position = "bottom",
-      strip.text.x = element_text(size = 16),
-      strip.text.y = element_text(size = 14, angle = 0, hjust = 0.5, vjust = 0.5),
-      legend.text = element_text(size = 16),
-      legend.title = element_text(size = 16))
+ggarrange(plotlist = plots_i2,
+          common.legend = TRUE,
+          legend = "bottom",
+          nrow = 4, ncol = 1,
+          labels = paste0(LETTERS[1:4], "  I\u00B2 = ", i2_levels, "%"),
+          hjust = 0,
+          font.label = list(size = 14, face = "bold"),
+          label.y = 1.01)
 
-plot_B <-  ggplot(theta04_long2, aes(x = delta_est, y = Coverage, color = as.factor(method))) +
-  geom_line(aes(group = method), linewidth = 1.2) +
-  geom_hline(aes(yintercept = 0.95), color = "black", linetype = "dashed") +
-   facet_grid(I2 ~ K,
-           labeller = labeller(
-             K = as_labeller(function(x) paste0("K == ", x),  
-                               default = label_parsed),
-            I2 = as_labeller(function(x) paste0("I^2 == ", x, "*'%'"), 
-                                default = label_parsed) # or label_both if you want 'tau^2 = 0'
-           )) +
-  labs(x = expression("Selection Weight"~delta),
-       y = "Coverage",
-       color = "Method type") +
-    scale_color_manual(name = " ",
-                     values = c("Naive_Biv" = "lightblue1", 
-                                "Adj_Biv" = "hotpink3", 
-                                 "Full" = "navy", 
-                                "Adj_Uni" = "thistle"),
-                      labels = c("Naive_Biv" = "Naive",
-                                 "Full" = "Complete Data",
-                                 "Adj_Biv" = "Bivariate",
-                                 "Adj_Uni" = "Univariate")) +
-  scale_x_continuous(breaks = seq(0, 1, by = 0.2)) +
-  scale_y_continuous(limits = c(0.63, 1), breaks = seq(0.7, 1, by = 0.1)) +
-  theme_minimal() +
-    theme(  
-      plot.margin = margin(20, 10, 10, 10),
-      plot.title = element_text(size = 16, hjust = 0.5), 
-      axis.title = element_text(size = 16), 
-      legend.position = "bottom",
-      strip.text.x = element_text(size = 16),
-      strip.text.y = element_text(size = 14, angle = 0, hjust = 0.5, vjust = 0.5),
-      legend.text = element_text(size = 16),
-      legend.title = element_text(size = 16))
-
-ggarrange(
-  plot_A,
-  plot_B,
-  common.legend = TRUE,
-  legend = "bottom",
-  nrow = 2,
-  labels = c("A Selection on z-score", "B Selection on treatment effect"),
-  hjust = 0,
-  font.label = list(size = 16, face = "bold"),
-  label.y = 1.01,
-  heights = c(1, 1.1)
-)
-
-ggsave("Plots_Paper/Supp_SimStudy_Coverage.png", width = 10, height = 10)
+ggsave("Plots_Paper/Supp_SimStudy_Coverage_rho0.png", width = 10, height = 12)
 ```
 
-CI width
 
-```{r, echo = FALSE, fig.width=10, fig.height=10}
+```{r, fig.width=10, fig.height=12}
+# check the actual CI width range per I2 level to choose sensible limits
+theta04_plot %>%
+  group_by(I2) %>%
+  summarise(min_CI = min(CI_Width, na.rm = TRUE),
+            max_CI = max(CI_Width, na.rm = TRUE))
 
-plot_A <- ggplot(theta04_long1, aes(x = delta_est, y = CI_Width, color = as.factor(method))) +
-  geom_line(aes(group = method), linewidth = 1.2) +
-  facet_grid(I2 ~ K,
-           labeller = labeller(
-             K = as_labeller(function(x) paste0("K == ", x), 
-                               default = label_parsed),
-            I2 = as_labeller(function(x) paste0("I^2 == ", x, "*'%'"), 
-                                default = label_parsed) # or label_both if you want 'tau^2 = 0'
-           )) +
-  labs(x = expression("Selection Weight"~delta),
-       y = "Confidence Interval Width",
-       color = "Method type") +
-  scale_color_manual(name = " ",
-                     values = c("Naive_Biv" = "lightblue1", 
-                                "Adj_Biv" = "hotpink3", 
-                                 "Full" = "navy", 
-                                "Adj_Uni" = "thistle"),
-                      labels = c("Naive_Biv" = "Naive",
-                                 "Full" = "Complete Data",
-                                 "Adj_Biv" = "Bivariate",
-                                 "Adj_Uni" = "Univariate")) +
-  scale_x_continuous(breaks = seq(0, 1, by = 0.2)) +
-  theme_minimal() +
-    theme(  
-      plot.margin = margin(20, 10, 10, 10),
-      plot.title = element_text(size = 16, hjust = 0.5), 
-      axis.title = element_text(size = 16), 
-      legend.position = "bottom",
-      strip.text.x = element_text(size = 16),
-      strip.text.y = element_text(size = 14, angle = 0, hjust = 0.5, vjust = 0.5),
-      legend.text = element_text(size = 16),
-      legend.title = element_text(size = 16))
+# y-axis limits and tick spacing per I2 level (adjust after checking the table above)
+y_settings <- list("0"  = list(lim = c(0.16, 0.42), by = 0.1),
+                   "30" = list(lim = c(0.18, 0.50), by = 0.1),
+                   "60" = list(lim = c(0.22, 0.60), by = 0.1),
+                   "90" = list(lim = c(0.39, 1.1), by = 0.2))
 
-plot_B <-  ggplot(theta04_long2, aes(x = delta_est, y = CI_Width, color = as.factor(method))) +
-  geom_line(aes(group = method), linewidth = 1.2) +
-   facet_grid(I2 ~ K,
-           labeller = labeller(
-             K = as_labeller(function(x) paste0("K == ", x),  
-                               default = label_parsed),
-            I2 = as_labeller(function(x) paste0("I^2 == ", x, "*'%'"), 
-                                default = label_parsed) # or label_both if you want 'tau^2 = 0'
-           )) +
-  labs(x = expression("Selection Weight"~delta),
-       y = "Confidence Interval Width",
-       color = "Method type") +
-    scale_color_manual(name = " ",
-                     values = c("Naive_Biv" = "lightblue1", 
-                                "Adj_Biv" = "hotpink3", 
-                                 "Full" = "navy", 
-                                "Adj_Uni" = "thistle"),
-                      labels = c("Naive_Biv" = "Naive",
-                                 "Full" = "Complete Data",
-                                 "Adj_Biv" = "Bivariate",
-                                 "Adj_Uni" = "Univariate")) +
-  scale_x_continuous(breaks = seq(0, 1, by = 0.2)) +
-  theme_minimal() +
-    theme(  
-      plot.margin = margin(20, 10, 10, 10),
-      plot.title = element_text(size = 16, hjust = 0.5), 
-      axis.title = element_text(size = 16), 
-      legend.position = "bottom",
-      strip.text.x = element_text(size = 16),
-      strip.text.y = element_text(size = 14, angle = 0, hjust = 0.5, vjust = 0.5),
-      legend.text = element_text(size = 16),
-      legend.title = element_text(size = 16))
-  
-ggarrange(
-  plot_A,
-  plot_B,
-  common.legend = TRUE,
-  legend = "bottom",
-  nrow = 2,
-  labels = c("A Selection on z-score", "B Selection on treatment effect"),
-  hjust = 0,
-  font.label = list(size = 16, face = "bold"),
-  label.y = 1.01,
-  heights = c(1, 1.1)
-)
+plots_i2  <- lapply(i2_levels, plot_CIWidth_i2)
 
-ggsave("Plots_Paper/Supp_SimStudy_CIWidth.png", width = 10, height = 10)
+ggarrange(plotlist = plots_i2,
+          common.legend = TRUE,
+          legend = "bottom",
+          nrow = 4, ncol = 1,
+          labels = paste0(LETTERS[1:4], "  I\u00B2 = ", i2_levels, "%"),
+          hjust = 0,
+          font.label = list(size = 14, face = "bold"),
+          label.y = 1.01)
+
+ggsave("Plots_Paper/Supp_SimStudy_CIWidth_rho0.png", width = 10, height = 12)
 ```
 
 ### Analyse numerical stability parameters
 
 ```{r}
-stability_summary <- theta04_long %>%
-  group_by(K, tau2_val, select_type) %>%
-  summarise(
-    Mean_Attempts = mean(N_Attempts),
-    Mean_Failure  = mean(Failure_Rate),
-    Mean_Redraws  = mean(Avg_Redraws)
-  )
-print(stability_summary)
+stability <- res_simstudy %>%
+  dplyr::select(scenario_idx,
+                K,
+                tau2_val,
+                rho_b,
+                rho_w,
+                delta_sim,
+                p1,
+                select_type,
+                delta_est,
+                
+                Prop_Redrawn,
+                Avg_Redraws,
+                Max_Redraws,
+                
+                Failure_Rate_Full,
+                Failure_Rate_Naive,
+                Failure_Rate_Uni,
+                Failure_Rate_Biv,
+                
+                Mean_Complete_Pairs,
+                Mean_Failed_Imputations_Uni,
+                Mean_Failed_Imputations_Biv)
+
+stability <- stability %>%
+  dplyr::mutate(I2 = dplyr::case_when(tau2_val == 0    ~ 0,
+                                      tau2_val == 0.02 ~ 0.30,
+                                      tau2_val == 0.06 ~ 0.60,
+                                      tau2_val == 0.36 ~ 0.90,
+                                      TRUE ~ NA_real_))
+
+# make sure all variables are numeric
+stability <- stability %>%
+  mutate(across(c(tau2_val, rho_b, rho_w, delta_sim, p1, delta_est,
+                  Avg_Redraws, Prop_Redrawn, Max_Redraws, Failure_Rate_Full, 
+                  Failure_Rate_Naive, Failure_Rate_Uni, Failure_Rate_Biv,
+                  Mean_Complete_Pairs, Mean_Failed_Imputations_Biv,
+                  Mean_Failed_Imputations_Uni), as.numeric))
+
+stability_p02 <- subset(stability, p1 == "0.2")
+
+stability_K_I2 <- stability_p02 %>%
+  dplyr::group_by(K, I2) %>%
+  dplyr::summarise(Prop_Redrawn = mean(Prop_Redrawn, na.rm = TRUE),
+                   Avg_Redraws = mean(Avg_Redraws, na.rm = TRUE),
+                   Failure_Full = mean(Failure_Rate_Full, na.rm = TRUE),
+                   Failure_Naive = mean(Failure_Rate_Naive, na.rm = TRUE),
+                   Failure_Uni = mean(Failure_Rate_Uni, na.rm = TRUE),
+                   Failure_Biv = mean(Failure_Rate_Biv, na.rm = TRUE),
+                      .groups = "drop")
+
+knitr::kable(stability_K_I2)
 ```
+
+
+```{r}
+ggplot(stability_K_I2, aes(x = I2, y = Prop_Redrawn, group = factor(K),
+                           linetype = factor(K))) +
+  geom_line() +
+  geom_point() +
+  scale_x_continuous(breaks = c(0, 0.3, 0.6, 0.9), 
+                     labels = c("0%", "30%", "60%", "90%")) +
+  labs(x = expression(I^2), y = "Proportion of repetitions requiring redraw",
+       linetype = "Number of studies (K)") +
+  theme_minimal()
+```
+
+##  theta1 = theta2 = 0.4, rho_B = 0.8, rho_w = 0, p_i = 0.2, n_sim = 1900, M = 200
+
+```{r}
+res_simstudy  <- read.csv2("Data/Sim_summary/data_simulation_different_rhos_2026-10-15.csv", sep = ",")
+
+# turn data into long format for simulation parameters
+theta04_long <- res_simstudy %>%
+  pivot_longer(cols = matches("^(Bias|MSE|Coverage|CI_Width)_"), 
+               names_to = c(".value", "method"),
+               names_pattern = "^(Bias|MSE|Coverage|CI_Width)_(.*)")
+
+# add I2 variable
+theta04_long <- theta04_long %>%
+  mutate(I2 = case_when(tau2_val == 0.00 ~ "0",
+                        tau2_val == 0.02 ~ "30",
+                        tau2_val == 0.06 ~ "60",
+                        tau2_val == 0.36 ~ "90",
+                        TRUE             ~ NA_character_))
+
+# make sure all variables are numeric
+theta04_long <- theta04_long %>%
+  mutate(across(c(K, theta_1, theta_2, tau2_val, rho_b, rho_w, delta_sim, p1, delta_est,                      Bias, MSE, Coverage, CI_Width, I2), as.numeric))
+```
+
+
+```{r, fig.width=10, fig.height=12}
+theta04_plot <- theta04_long %>%
+  filter(select_type %in% c("zscore", "effect"),
+         method %in% c("Naive_Biv", "Adj_Biv", "Full", "Adj_Uni"),
+         rho_w == "0") %>%
+  mutate(select_type = factor(select_type,
+                              levels = c("zscore", "effect"),
+                              labels = c("Selection on\nz-score",
+                                         "Selection on\ntreatment effect")))
+
+# check the actual bias range per I2 level to choose sensible limits
+theta04_plot %>%
+  group_by(I2) %>%
+  summarise(min_bias = min(Bias, na.rm = TRUE),
+            max_bias = max(Bias, na.rm = TRUE))
+
+# y-axis limits and tick spacing per I2 level (adjust after checking the table above)
+y_settings <- list("0"  = list(lim = c(-0.03, 0.05), by = 0.02),
+                   "30" = list(lim = c(-0.03, 0.06), by = 0.02),
+                   "60" = list(lim = c(-0.04, 0.08), by = 0.04),
+                   "90" = list(lim = c(-0.05, 0.22), by = 0.10))
+
+plots_i2  <- lapply(i2_levels, plot_bias_i2)
+
+ggarrange(plotlist = plots_i2,
+          common.legend = TRUE,
+          legend = "bottom",
+          nrow = 4, ncol = 1,
+          labels = paste0(LETTERS[1:4], "  I\u00B2 = ", i2_levels, "%"),
+          hjust = 0,
+          font.label = list(size = 14, face = "bold"),
+          label.y = 1.0)
+
+ggsave("Plots_Paper/Supp_SimStudy_Bias_rhoW0.png", width = 10, height = 12)
+```
+
+
+```{r, fig.width=10, fig.height=12}
+# check the actual MSE range per I2 level to choose sensible limits
+theta04_plot %>%
+  group_by(I2) %>%
+  summarise(min_MSE = min(MSE, na.rm = TRUE),
+            max_MSE = max(MSE, na.rm = TRUE))
+
+# y-axis limits and tick spacing per I2 level (adjust after checking the table above)
+y_settings <- list("0"  = list(lim = c(0, 0.01), by = 0.01),
+                   "30" = list(lim = c(0, 0.02), by = 0.01),
+                   "60" = list(lim = c(0, 0.025), by = 0.01),
+                   "90" = list(lim = c(0, 0.1), by = 0.05))
+
+plots_i2  <- lapply(i2_levels, plot_MSE_i2)
+
+ggarrange(plotlist = plots_i2,
+          common.legend = TRUE,
+          legend = "bottom",
+          nrow = 4, ncol = 1,
+          labels = paste0(LETTERS[1:4], "  I\u00B2 = ", i2_levels, "%"),
+          hjust = 0,
+          font.label = list(size = 14, face = "bold"),
+          label.y = 1.01)
+
+ggsave("Plots_Paper/Supp_SimStudy_MSE_rhoW0.png", width = 10, height = 12)
+```
+
+
+```{r, fig.width=10, fig.height=12}
+# check the actual coverage range per I2 level to choose sensible limits
+theta04_plot %>%
+  group_by(I2) %>%
+  summarise(min_Cov = min(Coverage, na.rm = TRUE),
+            max_Cov = max(Coverage, na.rm = TRUE))
+
+# y-axis limits and tick spacing per I2 level (adjust after checking the table above)
+y_settings <- list("0"  = list(lim = c(0.88, 1), by = 0.1),
+                   "30" = list(lim = c(0.82, 1), by = 0.1),
+                   "60" = list(lim = c(0.79, 1), by = 0.1),
+                   "90" = list(lim = c(0.54, 1), by = 0.2))
+
+plots_i2  <- lapply(i2_levels, plot_Cov_i2)
+
+ggarrange(plotlist = plots_i2,
+          common.legend = TRUE,
+          legend = "bottom",
+          nrow = 4, ncol = 1,
+          labels = paste0(LETTERS[1:4], "  I\u00B2 = ", i2_levels, "%"),
+          hjust = 0,
+          font.label = list(size = 14, face = "bold"),
+          label.y = 1.01)
+
+ggsave("Plots_Paper/Supp_SimStudy_Coverage_rhoW0.png", width = 10, height = 12)
+```
+
+
+```{r, fig.width=10, fig.height=12}
+# check the actual CI width range per I2 level to choose sensible limits
+theta04_plot %>%
+  group_by(I2) %>%
+  summarise(min_CI = min(CI_Width, na.rm = TRUE),
+            max_CI = max(CI_Width, na.rm = TRUE))
+
+# y-axis limits and tick spacing per I2 level (adjust after checking the table above)
+y_settings <- list("0"  = list(lim = c(0.16, 0.42), by = 0.1),
+                   "30" = list(lim = c(0.18, 0.50), by = 0.1),
+                   "60" = list(lim = c(0.22, 0.60), by = 0.1),
+                   "90" = list(lim = c(0.39, 1.1), by = 0.2))
+
+plots_i2  <- lapply(i2_levels, plot_CIWidth_i2)
+
+ggarrange(plotlist = plots_i2,
+          common.legend = TRUE,
+          legend = "bottom",
+          nrow = 4, ncol = 1,
+          labels = paste0(LETTERS[1:4], "  I\u00B2 = ", i2_levels, "%"),
+          hjust = 0,
+          font.label = list(size = 14, face = "bold"),
+          label.y = 1.01)
+
+
+ggsave("Plots_Paper/Supp_SimStudy_CIWidth_rhoW0.png", width = 10, height = 12)
+```
+
+
+### Analyse numerical stability parameters
+
+```{r}
+stability <- res_simstudy %>%
+  dplyr::select(scenario_idx,
+                K,
+                tau2_val,
+                rho_b,
+                rho_w,
+                delta_sim,
+                p1,
+                select_type,
+                delta_est,
+                
+                Prop_Redrawn,
+                Avg_Redraws,
+                Max_Redraws,
+                
+                Failure_Rate_Full,
+                Failure_Rate_Naive,
+                Failure_Rate_Uni,
+                Failure_Rate_Biv,
+                
+                Mean_Complete_Pairs,
+                Mean_Failed_Imputations_Uni,
+                Mean_Failed_Imputations_Biv)
+
+stability <- stability %>%
+  dplyr::mutate(I2 = dplyr::case_when(tau2_val == 0    ~ 0,
+                                      tau2_val == 0.02 ~ 0.30,
+                                      tau2_val == 0.06 ~ 0.60,
+                                      tau2_val == 0.36 ~ 0.90,
+                                      TRUE ~ NA_real_))
+
+# make sure all variables are numeric
+stability <- stability %>%
+  mutate(across(c(tau2_val, rho_b, rho_w, delta_sim, p1, delta_est,
+                  Avg_Redraws, Prop_Redrawn, Max_Redraws, Failure_Rate_Full, 
+                  Failure_Rate_Naive, Failure_Rate_Uni, Failure_Rate_Biv,
+                  Mean_Complete_Pairs, Mean_Failed_Imputations_Biv,
+                  Mean_Failed_Imputations_Uni), as.numeric))
+
+stabilityp02 <- subset(stability, p1 == "0.2")
+
+stability_K_I2 <- stabilityp02 %>%
+  dplyr::group_by(K, I2) %>%
+  dplyr::summarise(Prop_Redrawn = mean(Prop_Redrawn, na.rm = TRUE),
+                   Avg_Redraws = mean(Avg_Redraws, na.rm = TRUE),
+                   Failure_Full = mean(Failure_Rate_Full, na.rm = TRUE),
+                   Failure_Naive = mean(Failure_Rate_Naive, na.rm = TRUE),
+                   Failure_Uni = mean(Failure_Rate_Uni, na.rm = TRUE),
+                   Failure_Biv = mean(Failure_Rate_Biv, na.rm = TRUE),
+    .groups = "drop")
+
+knitr::kable(stability_K_I2)
+```
+
+```{r}
+ggplot(stability_K_I2, aes(x = I2, y = Prop_Redrawn, group = factor(K),
+                           linetype = factor(K))) +
+  geom_line() +
+  geom_point() +
+  scale_x_continuous(breaks = c(0, 0.3, 0.6, 0.9), labels = c("0%", "30%", "60%", "90%")) +
+  labs(x = expression(I^2), y = "Proportion of repetitions requiring redraw",
+       linetype = "Number of studies (K)") +
+  theme_minimal()
+```
+
+##  theta1 = theta2 = 0.4, rho_B = 0, rho_w = 0.8, p_i = 0.2, n_sim = 1900, M = 200
+
+```{r, fig.width=10, fig.height=10}
+theta04_plot <- theta04_long %>%
+  filter(select_type %in% c("zscore", "effect"),
+         method %in% c("Naive_Biv", "Adj_Biv", "Full", "Adj_Uni"),
+         rho_w == "0.8") %>%
+  mutate(select_type = factor(select_type,
+                              levels = c("zscore", "effect"),
+                              labels = c("Selection on\nz-score",
+                                         "Selection on\ntreatment effect")))
+
+# check the actual bias range per I2 level to choose sensible limits
+theta04_plot %>%
+  group_by(I2) %>%
+  summarise(min_bias = min(Bias, na.rm = TRUE),
+            max_bias = max(Bias, na.rm = TRUE))
+
+# y-axis limits and tick spacing per I2 level (adjust after checking the table above)
+y_settings <- list("0"  = list(lim = c(-0.03, 0.06), by = 0.02),
+                   "30" = list(lim = c(-0.02, 0.09), by = 0.04),
+                   "60" = list(lim = c(-0.03, 0.11), by = 0.04),
+                   "90" = list(lim = c(-0.05, 0.28), by = 0.10))
+
+plots_i2  <- lapply(i2_levels, plot_bias_i2)
+
+ggarrange(plotlist = plots_i2,
+          common.legend = TRUE,
+          legend = "bottom",
+          nrow = 4, ncol = 1,
+          labels = paste0(LETTERS[1:4], "  I\u00B2 = ", i2_levels, "%"),
+          hjust = 0,
+          font.label = list(size = 14, face = "bold"),
+          label.y = 1.0)
+
+ggsave("Plots_Paper/Supp_SimStudy_Bias_rhoW08.png", width = 10, height = 12)
+```
+
+
+```{r, fig.width=10, fig.height=12}
+# check the actual MSE range per I2 level to choose sensible limits
+theta04_plot %>%
+  group_by(I2) %>%
+  summarise(min_MSE = min(MSE, na.rm = TRUE),
+            max_MSE = max(MSE, na.rm = TRUE))
+
+# y-axis limits and tick spacing per I2 level (adjust after checking the table above)
+y_settings <- list("0"  = list(lim = c(0, 0.01), by = 0.01),
+                   "30" = list(lim = c(0, 0.015), by = 0.01),
+                   "60" = list(lim = c(0, 0.025), by = 0.01),
+                   "90" = list(lim = c(0, 0.1), by = 0.05))
+
+plots_i2  <- lapply(i2_levels, plot_MSE_i2)
+
+ggarrange(plotlist = plots_i2,
+          common.legend = TRUE,
+          legend = "bottom",
+          nrow = 4, ncol = 1,
+          labels = paste0(LETTERS[1:4], "  I\u00B2 = ", i2_levels, "%"),
+          hjust = 0,
+          font.label = list(size = 14, face = "bold"),
+          label.y = 1.01)
+
+ggsave("Plots_Paper/Supp_SimStudy_MSE_rhoW08.png", width = 10, height = 12)
+```
+
+
+```{r, fig.width=10, fig.height=12}
+# check the actual coverage range per I2 level to choose sensible limits
+theta04_plot %>%
+  group_by(I2) %>%
+  summarise(min_Cov = min(Coverage, na.rm = TRUE),
+            max_Cov = max(Coverage, na.rm = TRUE))
+
+# y-axis limits and tick spacing per I2 level (adjust after checking the table above)
+y_settings <- list("0"  = list(lim = c(0.88, 1), by = 0.1),
+                   "30" = list(lim = c(0.82, 1), by = 0.1),
+                   "60" = list(lim = c(0.79, 1), by = 0.1),
+                   "90" = list(lim = c(0.55, 1), by = 0.2))
+
+plots_i2  <- lapply(i2_levels, plot_Cov_i2)
+
+ggarrange(plotlist = plots_i2,
+          common.legend = TRUE,
+          legend = "bottom",
+          nrow = 4, ncol = 1,
+          labels = paste0(LETTERS[1:4], "  I\u00B2 = ", i2_levels, "%"),
+          hjust = 0,
+          font.label = list(size = 14, face = "bold"),
+          label.y = 1.01)
+
+ggsave("Plots_Paper/Supp_SimStudy_Coverage_rhoW08.png", width = 10, height = 12)
+```
+
+
+```{r, fig.width=10, fig.height=12}
+# check the actual CI width range per I2 level to choose sensible limits
+theta04_plot %>%
+  group_by(I2) %>%
+  summarise(min_CI = min(CI_Width, na.rm = TRUE),
+            max_CI = max(CI_Width, na.rm = TRUE))
+
+# y-axis limits and tick spacing per I2 level (adjust after checking the table above)
+y_settings <- list("0"  = list(lim = c(0.16, 0.42), by = 0.1),
+                   "30" = list(lim = c(0.18, 0.50), by = 0.1),
+                   "60" = list(lim = c(0.22, 0.60), by = 0.1),
+                   "90" = list(lim = c(0.39, 1.1), by = 0.2))
+
+plots_i2  <- lapply(i2_levels, plot_CIWidth_i2)
+
+ggarrange(plotlist = plots_i2,
+          common.legend = TRUE,
+          legend = "bottom",
+          nrow = 4, ncol = 1,
+          labels = paste0(LETTERS[1:4], "  I\u00B2 = ", i2_levels, "%"),
+          hjust = 0,
+          font.label = list(size = 14, face = "bold"),
+          label.y = 1.01)
+
+ggsave("Plots_Paper/Supp_SimStudy_CIWidth_rhoW08.png", width = 10, height = 12)
+```
+
+
+### Analyse numerical stability parameters
+
+```{r}
+stability <- res_simstudy %>%
+  dplyr::select(scenario_idx,
+                K,
+                tau2_val,
+                rho_b,
+                rho_w,
+                delta_sim,
+                p1,
+                select_type,
+                delta_est,
+                
+                Prop_Redrawn,
+                Avg_Redraws,
+                Max_Redraws,
+                
+                Failure_Rate_Full,
+                Failure_Rate_Naive,
+                Failure_Rate_Uni,
+                Failure_Rate_Biv,
+                
+                Mean_Complete_Pairs,
+                Mean_Failed_Imputations_Uni,
+                Mean_Failed_Imputations_Biv)
+
+stability <- stability %>%
+  dplyr::mutate(I2 = dplyr::case_when(tau2_val == 0    ~ 0,
+                                      tau2_val == 0.02 ~ 0.30,
+                                      tau2_val == 0.06 ~ 0.60,
+                                      tau2_val == 0.36 ~ 0.90,
+                                      TRUE ~ NA_real_))
+
+# make sure all variables are numeric
+stability <- stability %>%
+  mutate(across(c(tau2_val, rho_b, rho_w, delta_sim, p1, delta_est,
+                  Avg_Redraws, Prop_Redrawn, Max_Redraws, Failure_Rate_Full, 
+                  Failure_Rate_Naive, Failure_Rate_Uni, Failure_Rate_Biv,
+                  Mean_Complete_Pairs, Mean_Failed_Imputations_Biv,
+                  Mean_Failed_Imputations_Uni), as.numeric))
+
+stabilityp02 <- subset(stability, p1 == "0.2")
+
+stability_K_I2 <- stabilityp02 %>%
+  dplyr::group_by(K, I2) %>%
+  dplyr::summarise(Prop_Redrawn = mean(Prop_Redrawn, na.rm = TRUE),
+                   Avg_Redraws = mean(Avg_Redraws, na.rm = TRUE),
+                   Failure_Full = mean(Failure_Rate_Full, na.rm = TRUE),
+                   Failure_Naive = mean(Failure_Rate_Naive, na.rm = TRUE),
+                   Failure_Uni = mean(Failure_Rate_Uni, na.rm = TRUE),
+                   Failure_Biv = mean(Failure_Rate_Biv, na.rm = TRUE),
+    .groups = "drop")
+
+knitr::kable(stability_K_I2)
+```
+
+
+##  theta1 = theta2 = 0, rho_B = 0.8, rho_w = 0.8, p_i = 0.2, n_sim = 1900, M = 200
+
+```{r}
+res_simstudy  <- read.csv2("Data/Sim_summary/data_simulation_low_treatment_2026-10-04.csv", sep = ",")
+
+# turn data into long format for simulation parameters
+theta04_long <- res_simstudy %>%
+  pivot_longer(cols = matches("^(Bias|MSE|Coverage|CI_Width)_"), 
+               names_to = c(".value", "method"),
+               names_pattern = "^(Bias|MSE|Coverage|CI_Width)_(.*)")
+
+# add I2 variable
+theta04_long <- theta04_long %>%
+  mutate(I2 = case_when(tau2_val == 0.00 ~ "0",
+                        tau2_val == 0.02 ~ "30",
+                        tau2_val == 0.06 ~ "60",
+                        tau2_val == 0.36 ~ "90",
+                        TRUE             ~ NA_character_))
+
+# make sure all variables are numeric
+theta04_long <- theta04_long %>%
+  mutate(across(c(K, theta_1, theta_2, tau2_val, rho_b, rho_w, delta_sim, p1, delta_est,                      Bias, MSE, Coverage, CI_Width, I2), as.numeric))
+```
+
+
+```{r, fig.width=10, fig.height=12}
+theta04_plot <- theta04_long %>%
+  filter(select_type %in% c("zscore", "effect"),
+         method %in% c("Naive_Biv", "Adj_Biv", "Full", "Adj_Uni"),
+         p1 == "0.2") %>%
+  mutate(select_type = factor(select_type,
+                              levels = c("zscore", "effect"),
+                              labels = c("Selection on\nz-score",
+                                         "Selection on\ntreatment effect")))
+
+# check the actual bias range per I2 level to choose sensible limits
+theta04_plot %>%
+  group_by(I2) %>%
+  summarise(min_bias = min(Bias, na.rm = TRUE),
+            max_bias = max(Bias, na.rm = TRUE))
+
+# y-axis limits and tick spacing per I2 level (adjust after checking the table above)
+y_settings <- list("0"  = list(lim = c(-0.02, 0.05), by = 0.02),
+                   "30" = list(lim = c(-0.02, 0.06), by = 0.04),
+                   "60" = list(lim = c(-0.01, 0.11), by = 0.04),
+                   "90" = list(lim = c(-0.02, 0.32), by = 0.10))
+
+plots_i2  <- lapply(i2_levels, plot_bias_i2)
+
+ggarrange(plotlist = plots_i2,
+          common.legend = TRUE,
+          legend = "bottom",
+          nrow = 4, ncol = 1,
+          labels = paste0(LETTERS[1:4], "  I\u00B2 = ", i2_levels, "%"),
+          hjust = 0,
+          font.label = list(size = 14, face = "bold"),
+          label.y = 1.0)
+
+ggsave("Plots_Paper/Supp_SimStudy_Bias_theta0.png", width = 10, height = 12)
+```
+
+
+
+```{r, fig.width=10, fig.height=12}
+# check the actual MSE range per I2 level to choose sensible limits
+theta04_plot %>%
+  group_by(I2) %>%
+  summarise(min_MSE = min(MSE, na.rm = TRUE),
+            max_MSE = max(MSE, na.rm = TRUE))
+
+# y-axis limits and tick spacing per I2 level (adjust after checking the table above)
+y_settings <- list("0"  = list(lim = c(0, 0.01), by = 0.01),
+                   "30" = list(lim = c(0, 0.015), by = 0.01),
+                   "60" = list(lim = c(0, 0.027), by = 0.01),
+                   "90" = list(lim = c(0, 0.16), by = 0.05))
+
+plots_i2  <- lapply(i2_levels, plot_MSE_i2)
+
+ggarrange(plotlist = plots_i2,
+          common.legend = TRUE,
+          legend = "bottom",
+          nrow = 4, ncol = 1,
+          labels = paste0(LETTERS[1:4], "  I\u00B2 = ", i2_levels, "%"),
+          hjust = 0,
+          font.label = list(size = 14, face = "bold"),
+          label.y = 1.01)
+
+ggsave("Plots_Paper/Supp_SimStudy_MSE_theta0.png", width = 10, height = 12)
+```
+
+
+```{r, fig.width=10, fig.height=10}
+# check the actual coverage range per I2 level to choose sensible limits
+theta04_plot %>%
+  group_by(I2) %>%
+  summarise(min_Cov = min(Coverage, na.rm = TRUE),
+            max_Cov = max(Coverage, na.rm = TRUE))
+
+# y-axis limits and tick spacing per I2 level (adjust after checking the table above)
+y_settings <- list("0"  = list(lim = c(0.9, 1), by = 0.1),
+                   "30" = list(lim = c(0.79, 1), by = 0.1),
+                   "60" = list(lim = c(0.64, 1), by = 0.1),
+                   "90" = list(lim = c(0.22, 1), by = 0.2))
+
+plots_i2  <- lapply(i2_levels, plot_Cov_i2)
+
+ggarrange(plotlist = plots_i2,
+          common.legend = TRUE,
+          legend = "bottom",
+          nrow = 4, ncol = 1,
+          labels = paste0(LETTERS[1:4], "  I\u00B2 = ", i2_levels, "%"),
+          hjust = 0,
+          font.label = list(size = 14, face = "bold"),
+          label.y = 1.01)
+
+ggsave("Plots_Paper/Supp_SimStudy_Coverage_theta0.png", width = 10, height = 12)
+```
+
+
+```{r, fig.width=10, fig.height=12}
+# check the actual CI width range per I2 level to choose sensible limits
+theta04_plot %>%
+  group_by(I2) %>%
+  summarise(min_CI = min(CI_Width, na.rm = TRUE),
+            max_CI = max(CI_Width, na.rm = TRUE))
+
+# y-axis limits and tick spacing per I2 level (adjust after checking the table above)
+y_settings <- list("0"  = list(lim = c(0.16, 0.42), by = 0.1),
+                   "30" = list(lim = c(0.18, 0.50), by = 0.1),
+                   "60" = list(lim = c(0.22, 0.60), by = 0.1),
+                   "90" = list(lim = c(0.37, 1.1), by = 0.2))
+
+plots_i2  <- lapply(i2_levels, plot_CIWidth_i2)
+
+ggarrange(plotlist = plots_i2,
+          common.legend = TRUE,
+          legend = "bottom",
+          nrow = 4, ncol = 1,
+          labels = paste0(LETTERS[1:4], "  I\u00B2 = ", i2_levels, "%"),
+          hjust = 0,
+          font.label = list(size = 14, face = "bold"),
+          label.y = 1.01)
+
+ggsave("Plots_Paper/Supp_SimStudy_CIWidth_theta0.png", width = 10, height = 12)
+```
+
+
+### Analyse numerical stability parameters
+
+```{r}
+stability <- res_simstudy %>%
+  dplyr::select(scenario_idx,
+                K,
+                tau2_val,
+                rho_b,
+                rho_w,
+                delta_sim,
+                p1,
+                select_type,
+                delta_est,
+                
+                Prop_Redrawn,
+                Avg_Redraws,
+                Max_Redraws,
+                
+                Failure_Rate_Full,
+                Failure_Rate_Naive,
+                Failure_Rate_Uni,
+                Failure_Rate_Biv,
+                
+                Mean_Complete_Pairs,
+                Mean_Failed_Imputations_Uni,
+                Mean_Failed_Imputations_Biv)
+
+stability <- stability %>%
+  dplyr::mutate(I2 = dplyr::case_when(tau2_val == 0    ~ 0,
+                                      tau2_val == 0.02 ~ 0.30,
+                                      tau2_val == 0.06 ~ 0.60,
+                                      tau2_val == 0.36 ~ 0.90,
+                                      TRUE ~ NA_real_))
+
+# make sure all variables are numeric
+stability <- stability %>%
+  mutate(across(c(tau2_val, rho_b, rho_w, delta_sim, p1, delta_est,
+                  Avg_Redraws, Prop_Redrawn, Max_Redraws, Failure_Rate_Full, 
+                  Failure_Rate_Naive, Failure_Rate_Uni, Failure_Rate_Biv,
+                  Mean_Complete_Pairs, Mean_Failed_Imputations_Biv,
+                  Mean_Failed_Imputations_Uni), as.numeric))
+
+stabilityp02 <- subset(stability, p1 == "0.2")
+
+stability_K_I2 <- stabilityp02 %>%
+  dplyr::group_by(K, I2) %>%
+  dplyr::summarise(Prop_Redrawn = mean(Prop_Redrawn, na.rm = TRUE),
+                   Avg_Redraws = mean(Avg_Redraws, na.rm = TRUE),
+                   Failure_Full = mean(Failure_Rate_Full, na.rm = TRUE),
+                   Failure_Naive = mean(Failure_Rate_Naive, na.rm = TRUE),
+                   Failure_Uni = mean(Failure_Rate_Uni, na.rm = TRUE),
+                   Failure_Biv = mean(Failure_Rate_Biv, na.rm = TRUE),
+                   .groups = "drop")
+
+knitr::kable(stability_K_I2)
+```
+
+```{r}
+ggplot(stability_K_I2, aes(x = I2, y = Prop_Redrawn, group = factor(K),
+                           linetype = factor(K))) +
+  geom_line() +
+  geom_point() +
+  scale_x_continuous(breaks = c(0, 0.3, 0.6, 0.9),
+                     labels = c("0%", "30%", "60%", "90%")) +
+  labs(x = expression(I^2), y = "Proportion of repetitions requiring redraw",
+       linetype = "Number of studies (K)") +
+  theme_minimal()
+```
+
+
+
+
+# Model Misspecification
+
+## theta1 = theta2 = 0.4, rho_B = 0.8, rho_W = 0.8, p_i = 0.2, n_sim = 1900, M = 200, delta_sim != delta_est, variance and tau estimated
+
+```{r}
+
+res_simstudy <- read.csv2("Data/Sim_summary/data_simulation_misspecified_delta_2026-10-05.csv", sep = ",")
+
+# turn data into long format for simulation parameters
+theta04_long <- res_simstudy %>%
+  pivot_longer(cols = matches("^(Bias|MSE|Coverage|CI_Width)_"), 
+               names_to = c(".value", "method"),
+               names_pattern = "^(Bias|MSE|Coverage|CI_Width)_(.*)")
+
+# add I2 variable
+theta04_long <- theta04_long %>%
+  mutate(I2 = case_when(tau2_val == 0.00 ~ "0",
+                        tau2_val == 0.02 ~ "30",
+                        tau2_val == 0.06 ~ "60",
+                        tau2_val == 0.36 ~ "90",
+                        TRUE             ~ NA_character_))
+
+# make sure all variables are numeric
+theta04_long <- theta04_long %>%
+  mutate(across(c(K, theta_1, theta_2, tau2_val, rho_b, rho_w, delta_sim, p1, delta_est,
+                  Avg_Redraws, Bias, MSE, Coverage, CI_Width, I2), as.numeric))
+
+```
+
+```{r, fig.width=10, fig.height=12}
+theta04_plot <- theta04_long %>%
+  filter(select_type %in% c("zscore", "effect"),
+         method %in% c("Naive_Biv", "Adj_Biv", "Full", "Adj_Uni"),
+         delta_sim == "0.8") %>%
+  mutate(select_type = factor(select_type,
+                              levels = c("zscore", "effect"),
+                              labels = c("Selection on\nz-score",
+                                         "Selection on\ntreatment effect")))
+
+# check the actual bias range per I2 level to choose sensible limits
+theta04_plot %>%
+  group_by(I2) %>%
+  summarise(min_bias = min(Bias, na.rm = TRUE),
+            max_bias = max(Bias, na.rm = TRUE))
+
+# y-axis limits and tick spacing per I2 level (adjust after checking the table above)
+y_settings <- list("0"  = list(lim = c(-0.03, 0.04), by = 0.02),
+                   "30" = list(lim = c(-0.03, 0.05), by = 0.04),
+                   "60" = list(lim = c(-0.04, 0.07), by = 0.04),
+                   "90" = list(lim = c(-0.05, 0.20), by = 0.10))
+
+plots_i2  <- lapply(i2_levels, plot_bias_i2)
+
+ggarrange(plotlist = plots_i2,
+          common.legend = TRUE,
+          legend = "bottom",
+          nrow = 4, ncol = 1,
+          labels = paste0(LETTERS[1:4], "  I\u00B2 = ", i2_levels, "%"),
+          hjust = 0,
+          font.label = list(size = 14, face = "bold"),
+          label.y = 1.0)
+
+ggsave("Plots_Paper/Supp_SimStudy_Bias.png", width = 10, height = 12)
+```
+```{r, fig.width=10, fig.height=12}
+# check the actual MSE range per I2 level to choose sensible limits
+theta04_plot %>%
+  group_by(I2) %>%
+  summarise(min_MSE = min(MSE, na.rm = TRUE),
+            max_MSE = max(MSE, na.rm = TRUE))
+
+# y-axis limits and tick spacing per I2 level (adjust after checking the table above)
+y_settings <- list("0"  = list(lim = c(0, 0.01), by = 0.01),
+                   "30" = list(lim = c(0, 0.015), by = 0.01),
+                   "60" = list(lim = c(0, 0.027), by = 0.01),
+                   "90" = list(lim = c(0, 0.11), by = 0.05))
+
+plots_i2  <- lapply(i2_levels, plot_MSE_i2)
+
+ggarrange(plotlist = plots_i2,
+          common.legend = TRUE,
+          legend = "bottom",
+          nrow = 4, ncol = 1,
+          labels = paste0(LETTERS[1:4], "  I\u00B2 = ", i2_levels, "%"),
+          hjust = 0,
+          font.label = list(size = 14, face = "bold"),
+          label.y = 1.01)
+
+ggsave("Plots_Paper/Supp_SimStudy_MSE.png", width = 10, height = 12)
+```
+
+
+```{r, fig.width=10, fig.height=12}
+# check the actual coverage range per I2 level to choose sensible limits
+theta04_plot %>%
+  group_by(I2) %>%
+  summarise(min_Cov = min(Coverage, na.rm = TRUE),
+            max_Cov = max(Coverage, na.rm = TRUE))
+
+# y-axis limits and tick spacing per I2 level (adjust after checking the table above)
+y_settings <- list("0"  = list(lim = c(0.9, 1), by = 0.1),
+                   "30" = list(lim = c(0.86, 1), by = 0.1),
+                   "60" = list(lim = c(0.82, 1), by = 0.1),
+                   "90" = list(lim = c(0.63, 1), by = 0.2))
+
+plots_i2  <- lapply(i2_levels, plot_Cov_i2)
+
+ggarrange(plotlist = plots_i2,
+          common.legend = TRUE,
+          legend = "bottom",
+          nrow = 4, ncol = 1,
+          labels = paste0(LETTERS[1:4], "  I\u00B2 = ", i2_levels, "%"),
+          hjust = 0,
+          font.label = list(size = 14, face = "bold"),
+          label.y = 1.01)
+
+ggsave("Plots_Paper/Supp_SimStudy_Coverage.png", width = 10, height = 12)
+```
+
+
+```{r, fig.width=10, fig.height=12}
+# check the actual CI width range per I2 level to choose sensible limits
+theta04_plot %>%
+  group_by(I2) %>%
+  summarise(min_CI = min(CI_Width, na.rm = TRUE),
+            max_CI = max(CI_Width, na.rm = TRUE))
+
+# y-axis limits and tick spacing per I2 level (adjust after checking the table above)
+y_settings <- list("0"  = list(lim = c(0.16, 0.42), by = 0.1),
+                   "30" = list(lim = c(0.18, 0.50), by = 0.1),
+                   "60" = list(lim = c(0.23, 0.60), by = 0.1),
+                   "90" = list(lim = c(0.41, 1.1), by = 0.2))
+
+plots_i2  <- lapply(i2_levels, plot_CIWidth_i2)
+
+ggarrange(plotlist = plots_i2,
+          common.legend = TRUE,
+          legend = "bottom",
+          nrow = 4, ncol = 1,
+          labels = paste0(LETTERS[1:4], "  I\u00B2 = ", i2_levels, "%"),
+          hjust = 0,
+          font.label = list(size = 14, face = "bold"),
+          label.y = 1.01)
+
+ggsave("Plots_Paper/Supp_SimStudy_CIWidth.png", width = 10, height = 12)
+```
+
+### Analyse numerical stability parameters
+
+```{r}
+stability <- res_simstudy %>%
+  dplyr::select(scenario_idx,
+                K,
+                tau2_val,
+                rho_b,
+                rho_w,
+                delta_sim,
+                p1,
+                select_type,
+                delta_est,
+                
+                Prop_Redrawn,
+                Avg_Redraws,
+                Max_Redraws,
+                
+                Failure_Rate_Full,
+                Failure_Rate_Naive,
+                Failure_Rate_Uni,
+                Failure_Rate_Biv,
+                
+                Mean_Complete_Pairs,
+                Mean_Failed_Imputations_Uni,
+                Mean_Failed_Imputations_Biv)
+
+stability <- stability %>%
+  dplyr::mutate(I2 = dplyr::case_when(tau2_val == 0    ~ 0,
+                                      tau2_val == 0.02 ~ 0.30,
+                                      tau2_val == 0.06 ~ 0.60,
+                                      tau2_val == 0.36 ~ 0.90,
+                                      TRUE ~ NA_real_))
+
+# make sure all variables are numeric
+stability <- stability %>%
+  mutate(across(c(tau2_val, rho_b, rho_w, delta_sim, p1, delta_est,
+                  Avg_Redraws, Prop_Redrawn, Max_Redraws, Failure_Rate_Full, 
+                  Failure_Rate_Naive, Failure_Rate_Uni, Failure_Rate_Biv,
+                  Mean_Complete_Pairs, Mean_Failed_Imputations_Biv,
+                  Mean_Failed_Imputations_Uni), as.numeric))
+
+stabilityp02 <- subset(stability, p1 == "0.2")
+
+stability_K_I2 <- stabilityp02 %>%
+  dplyr::group_by(K, I2) %>%
+  dplyr::summarise(Prop_Redrawn = mean(Prop_Redrawn, na.rm = TRUE),
+                   Avg_Redraws = mean(Avg_Redraws, na.rm = TRUE),
+                   Failure_Full = mean(Failure_Rate_Full, na.rm = TRUE),
+                   Failure_Naive = mean(Failure_Rate_Naive, na.rm = TRUE),
+                   Failure_Uni = mean(Failure_Rate_Uni, na.rm = TRUE),
+                   Failure_Biv = mean(Failure_Rate_Biv, na.rm = TRUE),
+                   .groups = "drop")
+
+knitr::kable(stability_K_I2)
+```
+
+```{r, echo = FALSE}
+ggplot(stability_K_I2, aes(x = I2, y = Prop_Redrawn, group = factor(K),
+                           linetype = factor(K))) +
+  geom_line() +
+  geom_point() +
+  scale_x_continuous(breaks = c(0, 0.3, 0.6, 0.9), 
+                     labels = c("0%", "30%", "60%", "90%")) +
+  labs(x = expression(I^2), y = "Proportion of repetitions requiring redraw",
+       linetype = "Number of studies (K)") +
+  theme_minimal()
+```
+
+# Heterogeneous study size
+
+## theta1 = theta2 = 0.4, rho_B = 0.8, rho_W = 0.8, p_i = 0.2, n_sim = 1900, M = 200, delta_sim = delta_est, variance and tau estimated
+
+```{r}
+
+res_simstudy <- read.csv2("Data/Sim_summary/data_simulation_heterogeneous_size_2026-10-07.csv", sep = ",")
+
+# turn data into long format for simulation parameters
+theta04_long <- res_simstudy %>%
+  pivot_longer(cols = matches("^(Bias|MSE|Coverage|CI_Width)_"), 
+               names_to = c(".value", "method"),
+               names_pattern = "^(Bias|MSE|Coverage|CI_Width)_(.*)")
+
+# add I2 variable
+theta04_long <- theta04_long %>%
+  mutate(I2 = case_when(tau2_val == 0.00 ~ "0",
+                        tau2_val == 0.02 ~ "30",
+                        tau2_val == 0.06 ~ "60",
+                        tau2_val == 0.36 ~ "90",
+                        TRUE             ~ NA_character_))
+
+# make sure all variables are numeric
+theta04_long <- theta04_long %>%
+  mutate(across(c(K, theta_1, theta_2, tau2_val, rho_b, rho_w, delta_sim, p1, delta_est,
+                  Avg_Redraws, Bias, MSE, Coverage, CI_Width, I2), as.numeric))
+```
+
+```{r, fig.width=10, fig.height=12}
+theta04_plot <- theta04_long %>%
+  filter(select_type %in% c("zscore", "effect"),
+         method %in% c("Naive_Biv", "Adj_Biv", "Full", "Adj_Uni")) %>%
+  mutate(select_type = factor(select_type,
+                              levels = c("zscore", "effect"),
+                              labels = c("Selection on\nz-score",
+                                         "Selection on\ntreatment effect")))
+
+# check the actual bias range per I2 level to choose sensible limits
+theta04_plot %>%
+  group_by(I2) %>%
+  summarise(min_bias = min(Bias, na.rm = TRUE),
+            max_bias = max(Bias, na.rm = TRUE))
+
+# y-axis limits and tick spacing per I2 level (adjust after checking the table above)
+y_settings <- list("0"  = list(lim = c(-0.02, 0.04), by = 0.02),
+                   "30" = list(lim = c(-0.02, 0.05), by = 0.04),
+                   "60" = list(lim = c(-0.03, 0.07), by = 0.04),
+                   "90" = list(lim = c(-0.06, 0.23), by = 0.10))
+
+plots_i2  <- lapply(i2_levels, plot_bias_i2)
+
+ggarrange(plotlist = plots_i2,
+          common.legend = TRUE,
+          legend = "bottom",
+          nrow = 4, ncol = 1,
+          labels = paste0(LETTERS[1:4], "  I\u00B2 = ", i2_levels, "%"),
+          hjust = 0,
+          font.label = list(size = 14, face = "bold"),
+          label.y = 1.0)
+
+ggsave("Plots_Paper/Supp_SimStudy_Bias_het.png", width = 10, height = 12)
+```
+
+```{r, fig.width=10, fig.height=12}
+# check the actual MSE range per I2 level to choose sensible limits
+theta04_plot %>%
+  group_by(I2) %>%
+  summarise(min_MSE = min(MSE, na.rm = TRUE),
+            max_MSE = max(MSE, na.rm = TRUE))
+
+# y-axis limits and tick spacing per I2 level (adjust after checking the table above)
+y_settings <- list("0"  = list(lim = c(0, 0.01), by = 0.01),
+                   "30" = list(lim = c(0, 0.015), by = 0.01),
+                   "60" = list(lim = c(0, 0.027), by = 0.01),
+                   "90" = list(lim = c(0, 0.11), by = 0.05))
+
+plots_i2  <- lapply(i2_levels, plot_MSE_i2)
+
+ggarrange(plotlist = plots_i2,
+          common.legend = TRUE,
+          legend = "bottom",
+          nrow = 4, ncol = 1,
+          labels = paste0(LETTERS[1:4], "  I\u00B2 = ", i2_levels, "%"),
+          hjust = 0,
+          font.label = list(size = 14, face = "bold"),
+          label.y = 1.01)
+
+ggsave("Plots_Paper/Supp_SimStudy_MSE_het.png", width = 10, height = 12)
+```
+
+
+```{r, fig.width=10, fig.height=12}
+# check the actual coverage range per I2 level to choose sensible limits
+theta04_plot %>%
+  group_by(I2) %>%
+  summarise(min_Cov = min(Coverage, na.rm = TRUE),
+            max_Cov = max(Coverage, na.rm = TRUE))
+
+# y-axis limits and tick spacing per I2 level (adjust after checking the table above)
+y_settings <- list("0"  = list(lim = c(0.9, 1), by = 0.1),
+                   "30" = list(lim = c(0.83, 1), by = 0.1),
+                   "60" = list(lim = c(0.79, 1), by = 0.1),
+                   "90" = list(lim = c(0.52, 1), by = 0.2))
+
+plots_i2  <- lapply(i2_levels, plot_Cov_i2)
+
+ggarrange(plotlist = plots_i2,
+          common.legend = TRUE,
+          legend = "bottom",
+          nrow = 4, ncol = 1,
+          labels = paste0(LETTERS[1:4], "  I\u00B2 = ", i2_levels, "%"),
+          hjust = 0,
+          font.label = list(size = 14, face = "bold"),
+          label.y = 1.01)
+
+ggsave("Plots_Paper/Supp_SimStudy_Coverage_het.png", width = 10, height = 12)
+```
+
+
+```{r, fig.width=10, fig.height=12}
+# check the actual CI width range per I2 level to choose sensible limits
+theta04_plot %>%
+  group_by(I2) %>%
+  summarise(min_CI = min(CI_Width, na.rm = TRUE),
+            max_CI = max(CI_Width, na.rm = TRUE))
+
+# y-axis limits and tick spacing per I2 level (adjust after checking the table above)
+y_settings <- list("0"  = list(lim = c(0.15, 0.35), by = 0.1),
+                   "30" = list(lim = c(0.17, 0.42), by = 0.1),
+                   "60" = list(lim = c(0.22, 0.54), by = 0.1),
+                   "90" = list(lim = c(0.39, 1.1), by = 0.2))
+
+plots_i2  <- lapply(i2_levels, plot_CIWidth_i2)
+
+ggarrange(plotlist = plots_i2,
+          common.legend = TRUE,
+          legend = "bottom",
+          nrow = 4, ncol = 1,
+          labels = paste0(LETTERS[1:4], "  I\u00B2 = ", i2_levels, "%"),
+          hjust = 0,
+          font.label = list(size = 14, face = "bold"),
+          label.y = 1.01)
+
+ggsave("Plots_Paper/Supp_SimStudy_CIWidth_het.png", width = 10, height = 12)
+```
+
+### Analyse numerical stability parameters
+
+```{r}
+stability <- res_simstudy %>%
+  dplyr::select(scenario_idx,
+                K,
+                tau2_val,
+                rho_b,
+                rho_w,
+                delta_sim,
+                p1,
+                select_type,
+                delta_est,
+                
+                Prop_Redrawn,
+                Avg_Redraws,
+                Max_Redraws,
+                
+                Failure_Rate_Full,
+                Failure_Rate_Naive,
+                Failure_Rate_Uni,
+                Failure_Rate_Biv,
+                
+                Mean_Complete_Pairs,
+                Mean_Failed_Imputations_Uni,
+                Mean_Failed_Imputations_Biv)
+
+stability <- stability %>%
+  dplyr::mutate(I2 = dplyr::case_when(tau2_val == 0    ~ 0,
+                                      tau2_val == 0.02 ~ 0.30,
+                                      tau2_val == 0.06 ~ 0.60,
+                                      tau2_val == 0.36 ~ 0.90,
+                                      TRUE ~ NA_real_))
+
+# make sure all variables are numeric
+stability <- stability %>%
+  mutate(across(c(tau2_val, rho_b, rho_w, delta_sim, p1, delta_est,
+                  Avg_Redraws, Prop_Redrawn, Max_Redraws, Failure_Rate_Full, 
+                  Failure_Rate_Naive, Failure_Rate_Uni, Failure_Rate_Biv,
+                  Mean_Complete_Pairs, Mean_Failed_Imputations_Biv,
+                  Mean_Failed_Imputations_Uni), as.numeric))
+
+stabilityp02 <- subset(stability, p1 == "0.2")
+
+stability_K_I2 <- stabilityp02 %>%
+  dplyr::group_by(K, I2) %>%
+  dplyr::summarise(Prop_Redrawn = mean(Prop_Redrawn, na.rm = TRUE),
+                   Avg_Redraws = mean(Avg_Redraws, na.rm = TRUE),
+                   Failure_Full = mean(Failure_Rate_Full, na.rm = TRUE),
+                   Failure_Naive = mean(Failure_Rate_Naive, na.rm = TRUE),
+                   Failure_Uni = mean(Failure_Rate_Uni, na.rm = TRUE),
+                   Failure_Biv = mean(Failure_Rate_Biv, na.rm = TRUE),
+                   .groups = "drop")
+
+knitr::kable(stability_K_I2)
+```
+
+```{r, echo = FALSE}
+ggplot(stability_K_I2, aes(x = I2, y = Prop_Redrawn, group = factor(K),
+                           linetype = factor(K))) +
+  geom_line() +
+  geom_point() +
+  scale_x_continuous(breaks = c(0, 0.3, 0.6, 0.9), 
+                     labels = c("0%", "30%", "60%", "90%")) +
+  labs(x = expression(I^2), y = "Proportion of repetitions requiring redraw",
+       linetype = "Number of studies (K)") +
+  theme_minimal()
+```
+
+# Proxy for $\rho_W$
+
+## theta1 = theta2 = 0.4, K = 25, p_i = 0.2, n_sim = 1900, M = 200, delta_sim = delta_est = (0, 0.5 1), variance and tau estimated
+
+```{r}
+
+res_simstudy <- read.csv2("Data/Sim_summary/data_simulation_rho_w_proxy_2026-10-08.csv", sep = ",")
+
+proxy_long <- res_simstudy %>%
+  filter(select_type %in% c("zscore", "effect")) %>%
+  pivot_longer(cols = matches("^(Bias|Coverage)_Adj_Biv(_Oracle|_Swapped)?$"),
+               names_to = c(".value", "method"),
+               names_pattern = "^(Bias|Coverage)_(.*)$") 
+
+proxy_long <- type.convert(proxy_long, as.is = TRUE)
+
+proxy_long <- proxy_long %>%
+  mutate(method  = factor(method, levels = c("Adj_Biv", "Adj_Biv_Oracle",  
+                                             "Adj_Biv_Swapped")),
+         rho_lab = paste0("rho[W]==", rho_w, "~~rho[B]==", rho_b),
+         I2 = case_when(tau2_val == 0.00 ~ "0",
+                               tau2_val == 0.02 ~ "30",
+                               tau2_val == 0.06 ~ "60",
+                               tau2_val == 0.36 ~ "90",
+                               TRUE             ~ NA_character_))
+
+proxy_long <- proxy_long %>%
+   mutate(select_type = factor(select_type,
+                               levels = c("zscore", "effect"),
+                               labels = c("Selection on\nz-score",
+                                          "Selection on\ntreatment effect")))
+
+```
+
+```{r, fig.width=10, fig.height=12}
+
+plot_proxy <- function(i2_level,
+                       metric = c("Bias", "Coverage"),
+                       data   = proxy_long,
+                       ylim   = NULL) {
+  metric <- match.arg(metric)
+  ref    <- if (metric == "Coverage") 0.95 else 0
+
+  ggplot(filter(data, I2 == i2_level),
+         aes(x = delta_est, y = .data[[metric]],
+             color = method, linetype = method, shape = method)) +
+    geom_hline(yintercept = ref, color = "black", linetype = "dashed") +
+    geom_line(aes(group = method), linewidth = 1.2) +
+    geom_point(size = 3) +
+    facet_grid(select_type ~ rho_lab,
+               labeller = labeller(rho_lab = label_parsed,
+                                   select_type = label_value)) +
+    labs(x = expression("Selection Weight"~delta), y = metric) +
+    scale_color_manual(name = " ",
+      values = c("Adj_Biv" = "#009E73", "Adj_Biv_Oracle" = "#56B4E9",
+                 "Adj_Biv_Swapped" = "#CC79A7"),
+      labels = c("Adj_Biv" = "Pearson proxy",
+                 "Adj_Biv_Oracle" = expression("True"~rho[W]),
+                 "Adj_Biv_Swapped" = expression("Swapped ("*rho[B]*")"))) +
+    scale_linetype_manual(name = " ",
+      values = c("Adj_Biv" = "solid", "Adj_Biv_Oracle" = "dashed",
+                 "Adj_Biv_Swapped" = "dotted"),
+      labels = c("Adj_Biv" = "Pearson proxy",
+                 "Adj_Biv_Oracle" = expression("True"~rho[W]),
+                 "Adj_Biv_Swapped" = expression("Swapped ("*rho[B]*")"))) +
+    scale_shape_manual(name = " ",
+      values = c("Adj_Biv" = 16, "Adj_Biv_Oracle" = 17, "Adj_Biv_Swapped" = 15),
+      labels = c("Adj_Biv" = "Pearson proxy",
+                 "Adj_Biv_Oracle" = expression("True"~rho[W]),
+                 "Adj_Biv_Swapped" = expression("Swapped ("*rho[B]*")"))) +
+    scale_x_continuous(breaks = c(0, 0.5, 1)) +
+    coord_cartesian(ylim = ylim) +
+    theme_minimal() +
+    theme(panel.spacing.y = unit(1, "lines"),
+          panel.spacing.x = unit(0.8, "lines"),
+          plot.margin = margin(t = 14, r = 10, b = 0, l = 10),
+          axis.title = element_text(size = 16),
+          legend.position = "bottom",
+          strip.text.x = element_text(size = 14),
+          strip.text.y = element_text(size = 12, angle = 0, hjust = 0.5, vjust = 0.5),
+          legend.text  = element_text(size = 16),
+          legend.title = element_text(size = 16))
+}
+
+plots_i2  <- lapply(i2_levels, plot_proxy)
+
+ggarrange(plotlist = plots_i2,
+          common.legend = TRUE,
+          legend = "bottom",
+          nrow = 4, ncol = 1,
+          labels = paste0(LETTERS[1:4], "  I\u00B2 = ", i2_levels, "%"),
+          hjust = 0,
+          font.label = list(size = 14, face = "bold"),
+          label.y = 1.0)
+
+ggsave("Plots_Paper/Supp_SimStudy_Bias_proxy.png", width = 10, height = 12)
+```
+
+
+```{r, fig.width=10, fig.height=12}
+# Generate the Coverage plots across all I^2 levels
+plots_coverage <- lapply(i2_levels, 
+                         plot_proxy, 
+                         metric = "Coverage",
+                         ylim   = c(0.8, 1.0))
+
+# Combine with ggarrange
+ggarrange(plotlist      = plots_coverage,
+          common.legend = TRUE,
+          legend        = "bottom",
+          nrow          = 4, 
+          ncol          = 1,
+          labels        = paste0(LETTERS[1:4], "  I\u00B2 = ", i2_levels, "%"),
+          hjust         = 0,
+          font.label    = list(size = 14, face = "bold"),
+          label.y       = 1.0)
+
+ggsave("Plots_Paper/Supp_SimStudy_Coverage_proxy.png", width = 10, height = 12)
+```
+
+
+```{r}
+rho_long <- res_simstudy %>%
+  filter(delta_est == 1) %>%    # strongest selection; drop if you want all δ
+  select(tau2_val, rho_w, rho_b, select_type, Mean_Rho_Hat, Mean_Rho_Hat_Full) %>%
+  pivot_longer(starts_with("Mean_Rho"), names_to = "which", values_to = "rho") %>%
+  mutate(which   = recode(which, Mean_Rho_Hat = "After ORB",
+                                 Mean_Rho_Hat_Full = "Complete data"),
+         rho_lab = paste0("rho[W]==", rho_w, "~~rho[B]==", rho_b))
+
+rho_long <- type.convert(rho_long, as.is = TRUE)
+
+rho_long <- rho_long %>%
+   mutate(select_type = factor(select_type,
+                               levels = c("zscore", "effect"),
+                               labels = c("Selection on\nz-score",
+                                          "Selection on\ntreatment effect")))
+
+
+# approximate variance-weighted mixture (within variance 2/n_arm = 0.04)
+theory <- distinct(rho_long, rho_w, rho_b, rho_lab) %>%
+  tidyr::crossing(tau2_val = seq(0, 0.36, length.out = 100)) %>%
+  mutate(rho = (rho_b * tau2_val + rho_w * 0.04) / (tau2_val + 0.04))
+
+ggplot(rho_long, aes(tau2_val, rho, color = which)) +
+  geom_hline(aes(yintercept = rho_w), data = distinct(rho_long, rho_w, rho_lab),
+             linetype = "dashed") +
+  geom_hline(aes(yintercept = rho_b), data = distinct(rho_long, rho_b, rho_lab),
+             linetype = "dashed") +
+  geom_line(linewidth = 1.2) + geom_point(size = 3) +
+  facet_grid(select_type ~ rho_lab, 
+             labeller = labeller(rho_lab = label_parsed,
+                                 select_type = label_value)) +
+  scale_x_continuous(breaks = c(0, 0.02, 0.06, 0.36), 
+                     labels = c("0", "0.02", "0.06", "0.36"), 
+                     guide = guide_axis(n.dodge = 2)) +
+  labs(x = expression(tau^2), y = "Mean Pearson proxy", color = " ") +
+  theme_minimal() + 
+  theme(legend.position = "bottom",   
+        strip.text.y = element_text(size = 10, angle = 0, hjust = 0.5, vjust = 0.5),
+        legend.text  = element_text(size = 14),
+        legend.title = element_text(size = 16),
+        panel.grid.major.x = element_blank(),
+       panel.grid.minor.x = element_blank())
+
+ggsave("Plots_Paper/Supp_SimStudy_proxy.png", width = 6, height = 4)
+```
+
+
 
