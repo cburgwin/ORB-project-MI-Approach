@@ -1,4 +1,4 @@
-
+# load libraries
 library(MASS)
 library(Matrix)
 library(metafor)
@@ -7,8 +7,6 @@ library(metafor)
 #---------------------------------------
 # Imputing missing se
 # --------------------------------
-
-
 impute_missing_se <- function(data,
                               target_theta_col,
                               target_se_col,
@@ -37,11 +35,9 @@ impute_missing_se <- function(data,
 }
 
 
-
 # ------------------------------------------
-# Univariate
+# Univariate functions
 # -----------------------------------------
-
 
 # Univariate Imputation under MAR (remember it assumes SE already imputed)
 run_univariate_imputation <- function(data, 
@@ -64,13 +60,13 @@ run_univariate_imputation <- function(data,
   n_rep <- nrow(data_rep)
   n_unrep <- nrow(data_unrep)
   K <- nrow(data_ordered)
-
   
   # Indexes after reordering
   rep_idx <- 1:n_rep
-  unrep_idx <- (n_rep + 1):K
+  # unrep_idx <- (n_rep + 1):K
+  unrep_idx <- n_rep + seq_len(n_unrep) 
   
-  # if nothing missing, return null
+  # if nothing missing, return null. 
   if (length(unrep_idx) == 0) return(NULL)
   
   # but also we need at least 4 reported studies
@@ -79,11 +75,15 @@ run_univariate_imputation <- function(data,
     return(NULL) 
   }
   
+  # Note: These two problem should be handled in the DGP, so should never fire. 
   
   # Fit REML on the reported data (Naive Estimate), save estimate & SE
   res_naive <- metafor::rma(yi = data_rep[[theta_col]],
                             sei = data_rep[[se_col]],
-                            method = model_type)
+                            method = model_type,
+                            control = list(stepadj = 0.1,
+                                           rel.tol = 1e-5,
+                                           maxiter = 200))
   theta_MA <- as.numeric(res_naive$beta)
   tau2_hat <- as.numeric(res_naive$tau2)
   SE2_mean <- res_naive$se^2
@@ -92,9 +92,7 @@ run_univariate_imputation <- function(data,
   J_K <- matrix(1, K, K) 
   
   #Total cov matrix
-  
   Sigma <- diag(data_ordered[[se_col]]^2 + tau2_hat) + (SE2_mean * J_K) 
-  
   
   # Partitioning (Eq. 10)
   Sigma_RR <- Sigma[rep_idx, rep_idx]
@@ -113,8 +111,6 @@ run_univariate_imputation <- function(data,
   imputed_draws <- MASS::mvrnorm(n = m, 
                                  mu = mu_cond, 
                                  Sigma = Sigma_cond)
-  
-  
   return(list(
     imp_draws  = imputed_draws,
     unrep_idx    = unrep_idx,
@@ -131,11 +127,13 @@ run_univariate_imputation <- function(data,
 #  Importance Sampling 
 # --------------------------
 
-adj_univariate <- function(mi_results, 
-                           delta = 0.5, 
-                           select_type = "zscore",
-                           model_type = "REML", 
-                           track.ess = TRUE) {
+# Split in two so the M refits are computed once and reused for every delta and selection type:
+# fit_imputations_uni(): refit on each completed dataset
+# pool_univariate():     importance weights and Rubin's rules
+# adj_univariate():      as before; with fits = NULL it refits (simulation), otherwise reuses fits
+
+fit_imputations_uni <- function(mi_results,                    
+                                model_type = "REML") {         
   
   imp_draws  <- mi_results$imp_draws
   data_ordered <- mi_results$data_ordered
@@ -147,12 +145,59 @@ adj_univariate <- function(mi_results,
   
   
   # if nothing missing, return null, will handle better in the outer loop of the simulation
-  if (length(unrep_idx) == 0) return(NULL)
+  if (length(unrep_idx) == 0) return(NULL) # I think it can never happen
   
   
   theta_col    <- mi_results$theta_col  #  from mi_results
   se_col       <- mi_results$se_col     #  from mi_results
   tau2_val <- mi_results$res_naive$tau2 # from mi_results
+  
+  # rma on each complete dataset 
+  # vector of thetas that is like [c(reported), NA, NA,NA ...]
+  
+  yi_base <- data_ordered[[theta_col]]
+  
+  fits <- lapply(seq_len(M), function(m) {
+    yi_complete <- yi_base
+    yi_complete[unrep_idx] <- imp_draws[m, ] # complete the vector of thetas with the simulated draws from here
+    tryCatch(
+      rma(yi = yi_complete, 
+          sei = data_ordered[[se_col]], 
+          method = model_type,
+          tau2 = tau2_val, # NOTE: freezing the tau at the estimated naive tau
+          control = list(stepadj = 0.1, 
+                         rel.tol = 1e-5, 
+                         maxiter = 200)),
+      error = function(e) NULL
+    )
+  })
+  
+  attr(fits, "failed.proportion") <- mean(sapply(fits, is.null))   # NEW:  failed refits
+  return(fits)   # failed fits stay as NULL
+}
+
+
+
+pool_univariate <- function(mi_results,                        
+                            fits,      # output of fit_imputations_uni()
+                            delta = 0.5,
+                            select_type = "zscore",
+                            track.ess = TRUE) {
+  
+  imp_draws  <- mi_results$imp_draws
+  data_ordered <- mi_results$data_ordered
+  unrep_idx    <- mi_results$unrep_idx
+  
+  # ensure imp_draws is a matrix
+  if (!is.matrix(imp_draws)) imp_draws <- matrix(imp_draws, ncol = length(unrep_idx))
+  M <- nrow(imp_draws)
+  
+  # if nothing missing, return null, will handle better in the outer loop of the simulation
+  if (length(unrep_idx) == 0) return(NULL)
+  
+  theta_col    <- mi_results$theta_col  #  from mi_results
+  se_col       <- mi_results$se_col     #  from mi_results
+  tau2_val     <- mi_results$res_naive$tau2 # from mi_results
   
   # extract the se useful for the z scores
   sei_unrep <- data_ordered[[se_col]][unrep_idx]   
@@ -171,28 +216,12 @@ adj_univariate <- function(mi_results,
     log_weights <- - delta * rowSums(imp_draws)
   }
   
-  # rma on each complete dataset 
-  # vector of thetas that is like [c(reported), NA, NA,NA ...]
+  # fits must come from the same imputations, one per row of imp_draws    
+  if (length(fits) != M) stop("fits and imp_draws do not match")
   
-  yi_base <- data_ordered[[theta_col]]
-  
-  fits <- lapply(seq_len(M), function(m) {
-    yi_complete <- yi_base
-    yi_complete[unrep_idx] <- imp_draws[m, ] # complete the vector of thetas with the simulated draws from here
-    tryCatch(
-      rma(yi = yi_complete, 
-          sei = data_ordered[[se_col]], 
-          method = model_type,
-          tau2 = tau2_val,
-          control = list(stepadj = 0.1, 
-                         rel.tol = 1e-5, 
-                         maxiter = 200)),
-      error = function(e) NULL
-    )
-  })
-  
-  # only take not failed 
+  # only take not failed
   valid       <- !sapply(fits, is.null)
+  if (!any(valid)) stop("All rma fits failed")   
   fits        <- fits[valid]
   log_weights <- log_weights[valid]
   
@@ -204,7 +233,6 @@ adj_univariate <- function(mi_results,
   max_log <- max(log_weights)
   w_norm <- exp(log_weights - max_log) / sum(exp(log_weights - max_log))
   
-  
   # Adjusted (Eq. 16)
   theta_adj  <- sum(w_norm * theta_MA_m)
   
@@ -214,13 +242,11 @@ adj_univariate <- function(mi_results,
   total_var <- var_within + var_between
   
   
-  out <- data.frame(
-    Approach = paste("Selection on", select_type),
-    Estimate = theta_adj,
-    SE       = sqrt(total_var),
-    CI_Lower = theta_adj - 1.96 * sqrt(total_var),
-    CI_Upper = theta_adj + 1.96 * sqrt(total_var)
-  )
+  out <- data.frame(Approach = paste("Selection on", select_type),
+                    Estimate = theta_adj,
+                    SE       = sqrt(total_var),
+                    CI_Lower = theta_adj - 1.96 * sqrt(total_var),
+                    CI_Upper = theta_adj + 1.96 * sqrt(total_var))
   
   if (track.ess) {
     ess <- 1 / sum(w_norm^2)
@@ -228,13 +254,25 @@ adj_univariate <- function(mi_results,
   }
   
   return(out)
+}
+
+
+
+adj_univariate <- function(mi_results, 
+                           delta = 0.5, 
+                           select_type = "zscore",
+                           model_type = "REML", 
+                           track.ess = TRUE,                   
+                           fits = NULL) {
+  if (is.null(fits)) fits <- fit_imputations_uni(mi_results, model_type)
   
+  pool_univariate(mi_results, fits, delta, select_type, track.ess)
 }
 
 
 
 # ---------------------------
-## Bivariate functions 
+## Bivariate functions
 # ----------------------------
 
 run_bivariate_imputation <- function(data,
@@ -242,18 +280,21 @@ run_bivariate_imputation <- function(data,
                                      se_cols, 
                                      rho_w = 0.4, 
                                      m = 1000, 
-                                     tau2_val,
+                                     tau2_val = NULL,  # NULL = tau2 estimated (application), value = fixed (simulation)
+                                     rho_b = NULL,     # NULL = rho_B estimated (application), value = fixed (simulation)
                                      model_type = "REML") {
   
   
   K <- nrow(data)
+  r_draws <- NULL   # m x K correlation draws, only for "estimated" / "studyspecific"
   
-  # --- Compute or Assign the Correlation Vector (r_vec) ---
-  if (is.character(rho_w) && rho_w %in% c("estimated", "studyspecific")) {
+  # Compute or Assign the Correlation Vector (r_vec)
+  if (is.character(rho_w) && rho_w %in% c("pearson", "estimated", "studyspecific")) {
     
     # Identify complete cases using the dynamic theta_cols passed into the function
     complete_cases <- which(!is.na(data[[theta_cols[1]]]) & !is.na(data[[theta_cols[2]]]))
     
+    # Note: this shoud be handled by the DGP
     if (length(complete_cases) < 4) {
       stop("Not enough complete pairs in the data to estimate a Pearson correlation.")
     }
@@ -272,17 +313,21 @@ run_bivariate_imputation <- function(data,
     mu_z <- mean(CIz)
     se_z <- diff(CIz) / (2 * 1.96)
     
+    # the naive fit uses V using the Pearson point estimate (-0.31 in Application) 
+    # the uncertainty enters per imputation through r_draws
+    r_vec <- rep(rho_hat, K)  
+    
+    # create a matrix m x K of correlations. 
     if (rho_w == "estimated") {
-      # One global correlation with uncertainty drawn once
-      r_global <- tanh(rnorm(1, 
-                             mean = mu_z,
-                             sd = se_z)) 
-      r_vec <- rep(r_global, K)
+      # One global correlation per imputation (= row) same for all studies
+      r_draws <- matrix(tanh(rnorm(m, 
+                                   mean = mu_z,
+                                   sd = se_z)), nrow = m, ncol = K)
     } else if (rho_w == "studyspecific") {
-      # One unique correlation sampled per study
-      r_vec <- tanh(rnorm(K,
-                          mean = mu_z, 
-                          sd = se_z))
+      # one correlation per imputation and per study
+      r_draws <- matrix(tanh(rnorm(m * K,
+                                   mean = mu_z, 
+                                   sd = se_z)), nrow = m, ncol = K)
     }
     
   } else {
@@ -293,7 +338,7 @@ run_bivariate_imputation <- function(data,
   }
   
   # study-major vector of length 2K (remember that as.numeric flatten by columns)
-  # so we have (Out1study1, out2study1, ...... out1studyK, out2studyK)
+  # so (Out1study1, out2study1, ...... out1studyK, out2studyK)
   y_vec <- as.numeric(t(as.matrix (data[, theta_cols]))) 
   se_vec <- as.numeric(t( as.matrix(data[, se_cols])))
   
@@ -310,7 +355,7 @@ run_bivariate_imputation <- function(data,
     return(NULL) 
   }
   
-  # build the within study covariance 
+  # build the within study covariance, using r_vec, which contains rho_hat (given or Pearson)
   V_list <- list()
   for (i in 1:K) { # one for each study 
     v1 <- data[[se_cols[1]]][i]^2
@@ -319,17 +364,15 @@ run_bivariate_imputation <- function(data,
     V_list[[i]] <- matrix(c(v1, cov_12, cov_12, v2), 2, 2)
   }
   
-  V_full <- as.matrix(Matrix::bdiag(V_list))
+  V_full <- as.matrix(Matrix::bdiag(V_list)) # This V_full is then used in the naive 
   
   # Create Long Data 
   # --> df that has row 1 = study 1 outcome 1, row 2 = study 1 outcome 2, row 3 = study 2 outcome 1 ....
-  data_long <- data.frame(
-    Study_id = rep(data$Study_id, each = 2),
-    outcome  = factor(rep(c("O1", "O2"), times = K)),
-    yi       = y_vec,
-    sei      = se_vec,
-    obs_id   = 1:(2*K)
-  )
+  data_long <- data.frame(Study_id = rep(data$Study_id, each = 2),
+                          outcome  = factor(rep(c("O1", "O2"), times = K)),
+                          yi       = y_vec,
+                          sei      = se_vec,
+                          obs_id   = 1:(2*K))
   
   # built within covariance matrix only based on reported studies
   reported_long <- data_long[rep_idx, ]
@@ -342,11 +385,11 @@ run_bivariate_imputation <- function(data,
                       random = ~ outcome | Study_id, 
                       struct = "UN",  # true effects varies for each study id (heterogeneity)
                       data = reported_long, 
-                      method = model_type, 
-                      rho = rho_hat,
-                      tau2 = tau2_val,
-                      control=list(rel.tol=1e-8,
-                                   maxiter=200))
+                      method = model_type,
+                      rho = rho_b,       # NULL -> rho_B estimated; a value provided above -> rho_B fixed
+                      tau2 = tau2_val,   # NULL -> estimated (application); value -> fixed (simulation)
+                      control = list(rel.tol = 1e-5,
+                                     iter.max = 200))
   
   # Construct Total Covariance Matrix Sigma
   Cov_theta_MA <- vcov(res_naive)
@@ -355,40 +398,76 @@ run_bivariate_imputation <- function(data,
   # save estimates from naive bivariate MA
   tau2_1 <- res_naive$tau2[1]
   tau2_2 <- res_naive$tau2[2]
-  rho_b  <- res_naive$rho
+  rho_b_hat <- res_naive$rho   #  if the rho_B provided to run_biv_imp() is NULL, then rho_b_hat is estimated
+  # if the rho_b is a number rho_b_hat = that number
   
-  # Extract Psi (Between-study variance-covariance matrix)  
+  # Create Psi (Between-study variance-covariance matrix)  
   Psi <- matrix(c(
-    tau2_1, rho_b * sqrt(tau2_1) * sqrt(tau2_2),
-    rho_b * sqrt(tau2_1) * sqrt(tau2_2), tau2_2),
+    tau2_1, rho_b_hat * sqrt(tau2_1) * sqrt(tau2_2),
+    rho_b_hat * sqrt(tau2_1) * sqrt(tau2_2), tau2_2),
     nrow = 2, ncol = 2
-    )
+  )
   I_K <- diag(K)
-  
-  # Use the Kronecker product to tile the 2x2 Vb_matrix across every study pair
-  # This results in the 2K x 2K matrix  
-  Sigma <- V_full + kronecker(I_K, Psi) + kronecker(J_K, Cov_theta_MA)
-  
-  # partitioning 
-  Sigma_RR <- Sigma[rep_idx, rep_idx, drop = FALSE]
-  Sigma_UU <- Sigma[unrep_idx, unrep_idx, drop = FALSE]
-  Sigma_UR <- Sigma[unrep_idx, rep_idx, drop = FALSE]
-  Sigma_RU <- Sigma[rep_idx, unrep_idx, drop = FALSE]
   
   #  Conditionals (Eq. 11)
   theta_MA_vec <- rep(coef(res_naive), times = K)  # vector 2K
   theta_R_MA <- theta_MA_vec[rep_idx] # vector K_R
   theta_U_MA <- theta_MA_vec[unrep_idx] # vector K_U
-  theta_R <- y_vec[rep_idx] # get reported summary estimates
+  theta_R <- y_vec[rep_idx] # extract reported estimates
   
-  inv_Sigma_RR <- solve(Sigma_RR)
-  mu_cond <- theta_U_MA + Sigma_UR %*% inv_Sigma_RR %*% (theta_R - theta_R_MA)
-  Sigma_cond <- Sigma_UU - Sigma_UR %*% inv_Sigma_RR %*% Sigma_RU
   
-  # Generate M Imputations
-  imputed_draws <- MASS::mvrnorm(n = m,
-                                 mu = as.numeric(mu_cond),
-                                 Sigma = Sigma_cond)
+  # Now, we estimated the naive model using rho_hat (which can be a given number or "estimated" or 
+  # "studyspecific"), but with the r_draws we need to build a matrix every imputation
+  
+  # so we use this function that impute the values given a specific within Variance matrix V
+  draw_missing_outcomes <- function(V, n) {  
+    # Use the Kronecker product to tile the 2x2 Vb_matrix across every study pair
+    # This results in the 2K x 2K matrix  
+    Sigma <- V + kronecker(I_K, Psi) + kronecker(J_K, Cov_theta_MA)
+    
+    # partitioning 
+    Sigma_RR <- Sigma[rep_idx, rep_idx, drop = FALSE]
+    Sigma_UU <- Sigma[unrep_idx, unrep_idx, drop = FALSE]
+    Sigma_UR <- Sigma[unrep_idx, rep_idx, drop = FALSE]
+    Sigma_RU <- Sigma[rep_idx, unrep_idx, drop = FALSE]
+    
+    
+    inv_Sigma_RR <- solve(Sigma_RR)
+    mu_cond <- theta_U_MA + Sigma_UR %*% inv_Sigma_RR %*% (theta_R - theta_R_MA)
+    Sigma_cond <- Sigma_UU - Sigma_UR %*% inv_Sigma_RR %*% Sigma_RU
+    
+    # Generate M Imputations
+    MASS::mvrnorm(n = n, # it will be a bit slower in the rho = "estimated" or "studyspec" case since it draws the missing one imputed row at the time 
+                  mu = as.numeric(mu_cond),
+                  Sigma = Sigma_cond)
+    
+  }
+  
+  # Generate the M imputations 
+  V_draws <- NULL    
+  if (is.null(r_draws)) {   # traditional case, rho_w is fixed and not sampled, the Simulation goes here 
+    imputed_draws <- draw_missing_outcomes(V_full, m)       # fixed rho_w: as used in naive 
+  } else {                                                  # in the application, r_draws is a 1000 x 12 matrix of sampled correlations
+    
+    V_draws <- list() # one withing corr matrix V for each imputed dataset
+    imputed_draws <- matrix(NA, nrow = m, ncol = length(unrep_idx)) # 1000 x 7 matrix 
+    
+    # Loop over imputations
+    for (imp in 1:m) {   
+      
+      V_list <- list()   # list of each withing study correlation V for each study (to then unify in a blockdiag)
+      for (study in 1:K) { # one block for each study 
+        v1 <- data[[se_cols[1]]][study]^2   
+        v2 <- data[[se_cols[2]]][study]^2   
+        cov_12 <- r_draws[imp, study] * sqrt(v1) * sqrt(v2)                       
+        V_list[[study]] <- matrix(c(v1, cov_12, cov_12, v2), 2, 2)  
+      }   
+      V_draws[[imp]] <- as.matrix(Matrix::bdiag(V_list))                         
+      
+      imputed_draws[imp, ] <- draw_missing_outcomes(V_draws[[imp]], 1)                  
+    }                                                                          
+  }     
+  
   if (length(unrep_idx) == 1) {
     imputed_draws <- matrix(imputed_draws, ncol = 1)
   }
@@ -399,18 +478,67 @@ run_bivariate_imputation <- function(data,
     res_naive    = res_naive,
     data_long    = data_long,
     V_full       = V_full,
+    r_draws      = r_draws,   # NULL for fixed rho_w
+    V_draws      = V_draws,   # list of m within-study matrices; NULL for fixed rho_w
     theta_cols   = theta_cols
   ))
 }
 
 
+# Same split as for the univariate functions
+fit_imputations_biv <- function(mi_results,        
+                                model_type = "REML") {
+  
+  # SETUP
+  imp_draws <- mi_results$imp_draws
+  data_long <- mi_results$data_long
+  unrep_idx <- mi_results$unrep_idx
+  V_full <- mi_results$V_full
+  
+  tau2_fixed <- mi_results$res_naive$tau2
+  rho_fixed  <- mi_results$res_naive$rho
+  
+  if (!is.matrix(imp_draws)) imp_draws <- matrix(imp_draws, ncol = length(unrep_idx))
+  M <- nrow(imp_draws)
+  
+  
+  # loop for each draw
+  fits <- lapply(seq_len(M), function(m) {
+    d <- data_long
+    
+    # create complete dataset
+    d$yi[unrep_idx] <- imp_draws[m, ]
+    
+    # refit with the V this imputation was drawn with (V_full when rho_w is fixed)
+    V_m <- if (is.null(mi_results$V_draws)) V_full else mi_results$V_draws[[m]]
+    
+    #fit the results
+    tryCatch(
+      rma.mv(yi,
+             V = V_m,   # NEW (was V_full)
+             mods = ~ outcome - 1,
+             random = ~ outcome | Study_id,
+             struct = "UN",
+             data = d,
+             method = model_type,
+             tau2 = tau2_fixed,
+             rho = rho_fixed,
+             control = list(rel.tol = 1e-5,
+                            iter.max = 200)),
+      error = function(e) NULL
+    )
+  })
+  return(fits)   #  failed fits stay as NULL
+}
 
-adj_bivariate <- function(mi_results,
-                          delta = 0.5,
-                          select_type = "zscore",
-                          model_type = "REML", 
-                          track.failed.proportion = TRUE, 
-                          track.ess = TRUE) {
+
+
+pool_bivariate <- function(mi_results,             
+                           fits,            # output of fit_imputations_biv()
+                           delta = 0.5,
+                           select_type = "zscore",
+                           track.failed.proportion = TRUE,
+                           track.ess = TRUE) {
   
   imp_draws <- mi_results$imp_draws
   data_long <- mi_results$data_long
@@ -419,16 +547,16 @@ adj_bivariate <- function(mi_results,
   
   tau2_fixed <- mi_results$res_naive$tau2
   rho_fixed  <- mi_results$res_naive$rho
-
+  
   if (!is.matrix(imp_draws)) imp_draws <- matrix(imp_draws, ncol = length(unrep_idx))
   M <- nrow(imp_draws)
   
+  # weight block 1
   # extract the se useful for the z scores
-  sei_unrep <- data_long$sei[unrep_idx]  
+  sei_unrep <- data_long$sei[unrep_idx]
   
   # check dimensions
   if (ncol(imp_draws) != length(sei_unrep)) stop ("Something is wrong with the number of unreported studies")
-  
   
   if (select_type == "zscore") {
     # divides every row in 'imp_draws' by the 'sei_unrep' vector
@@ -438,31 +566,10 @@ adj_bivariate <- function(mi_results,
     log_weights <- -delta * rowSums(imp_draws)
   }
   
-  # loop for each draw
-  fits <- lapply(seq_len(M), function(m) {
-    d <- data_long
-    
-    # create complete dataset
-    d$yi[unrep_idx] <- imp_draws[m, ]
-    
-    #fit the results
-    tryCatch( 
-      rma.mv(yi,
-             V = V_full,
-             mods = ~ outcome - 1,
-             random = ~ outcome | Study_id, 
-             struct = "UN",
-             data = d, 
-             method = model_type,
-             tau2 = tau2_fixed,
-             rho = rho_fixed,
-             control = list(stepadj = 0.1,
-                            rel.tol = 1e-5, 
-                            maxiter = 200)),
-      error = function(e) NULL
-    )
-  })
+  # fits must come from the same imputations, one per row of imp_draws
+  if (length(fits) != M) stop("fits and imp_draws do not match")
   
+  # Weight block 2 till the end
   # extract valid
   valid       <- sapply(fits, function(x) !is.null(x))
   fits        <- fits[valid]
@@ -478,7 +585,7 @@ adj_bivariate <- function(mi_results,
   max_log <- max(log_weights)
   w_norm <- exp(log_weights - max_log) / sum(exp(log_weights - max_log))
   
-  # Adjusted estimates 
+  # Adjusted estimates
   # remember w_norm is a vector of 1000 weights
   # theta_MA_m is a 1000 x 2 matrix
   theta_adj <- colSums(w_norm * theta_MA_m)               # this returns a VECTOR of length 2
@@ -489,14 +596,12 @@ adj_bivariate <- function(mi_results,
   total_var   <- var_within + var_between #length 2 vector
   
   if (length(theta_adj) != length(total_var) ) stop ("Something is off in the dimension of outcomes")
-  out <- data.frame(
-    Outcome  = c("O1", "O2"),
-    Approach = paste("Bivariate Selection on", select_type),
-    Estimate = theta_adj,
-    SE       = sqrt(total_var),
-    CI_Lower = theta_adj - 1.96 * sqrt(total_var),
-    CI_Upper = theta_adj + 1.96 * sqrt(total_var)
-  )
+  out <- data.frame(Outcome  = c("O1", "O2"),
+                    Approach = paste("Bivariate Selection on", select_type),
+                    Estimate = theta_adj,
+                    SE       = sqrt(total_var),
+                    CI_Lower = theta_adj - 1.96 * sqrt(total_var),
+                    CI_Upper = theta_adj + 1.96 * sqrt(total_var))
   
   rownames(out) <- NULL
   
@@ -505,11 +610,26 @@ adj_bivariate <- function(mi_results,
     out$ess <- ess
   }
   
-  if (track.failed.proportion) { 
+  if (track.failed.proportion) {
     failed.proportion <- sum(!valid) / M
     out$failed.proportion <- failed.proportion
   }
   return(out)
+}
+
+
+
+adj_bivariate <- function(mi_results,
+                          delta = 0.5,
+                          select_type = "zscore",
+                          model_type = "REML",
+                          track.failed.proportion = TRUE,
+                          track.ess = TRUE,
+                          fits = NULL) {                                          
+  if (is.null(fits)) fits <- fit_imputations_biv(mi_results, model_type)          
+  
+  pool_bivariate(mi_results, fits, delta, select_type,                            
+                 track.failed.proportion, track.ess)
 }
 
 
@@ -528,63 +648,78 @@ adj_bivariate <- function(mi_results,
 # rho_w withing study correlation 
 # n_arm is fixed to 50 in the whole simulation 
 
-
 generate_bivariate_ma <- function(K = 12,
                                   theta = c(0.4, 0.4),
                                   tau2 = c(0.06, 0.06), 
-                                  rho_b = 0.4,
-                                  rho_w = 0.4, 
-                                  n_arm = 50) {
+                                  rho_b = 0.8,
+                                  rho_w = 0.8, 
+                                  n_arm = 50,
+                                  large_study = NULL,
+                                  large_n_arm = 250) {
+  
+  # Study-specific sample sizes
+  n_arm_i <- rep(n_arm, K)
+  
+  if (!is.null(large_study)) {
+    n_arm_i[large_study] <- large_n_arm
+  }
   
   # Between-study covariance matrix (Psi)
   cov_b <- rho_b * sqrt(tau2[1]) * sqrt(tau2[2])
-  Psi <- matrix(c(tau2[1], cov_b, cov_b, tau2[2]), 2, 2)
+  
+  Psi <- matrix(c(tau2[1], cov_b,
+                  cov_b, tau2[2]), 
+                2, 2)
   
   # True study-specific effects (bivariate normal)
-  theta_i <- matrix(MASS::mvrnorm(n = K,
-                                  mu = theta,
-                                  Sigma = Psi), 
-                    nrow = K, ncol = 2)  
+  theta_i <- MASS::mvrnorm(n = K,
+                           mu = theta,
+                           Sigma = Psi)
   
-  #  matrix V for Wishart distribution
-  V_scale <- (1 / ((n_arm - 1) * n_arm)) * matrix(c(1, rho_w, rho_w, 1), 2, 2)
-  df_wishart <- 2 * (n_arm - 1)
-  
-  # Initialize vectors for obs effects and standard errors
+  # Initialize observed effects and standard errors
   y_obs <- matrix(NA, nrow = K, ncol = 2)
   se_obs <- matrix(NA, nrow = K, ncol = 2)
   
   for (i in 1:K) {
-    #  within-study covariance matrix for study i using Wishart (Sigma_i)
-    Sigma_i <- stats::rWishart(n = 1, df = df_wishart, Sigma = V_scale)[,,1]
     
-    # Draw observed effects (bivariate)
-    # sample the observed value from a Normal centerd in the true value (sampled above)
-    # and with variance from Widhart
-    y_obs[i, ] <- mvrnorm(n = 1, mu = theta_i[i, ], Sigma = Sigma_i)
+    # Study-specific sample size
+    n_i_arm <- n_arm_i[i]
+    
+    # Within-study covariance matrix for study i
+    V_scale <- (1 / ((n_i_arm - 1) * n_i_arm)) *
+      matrix(c(1, rho_w,
+               rho_w, 1), 2, 2)
+    
+    df_wishart <- 2 * (n_i_arm - 1)
+    
+    Sigma_i <- stats::rWishart(n = 1,
+                               df = df_wishart,
+                               Sigma = V_scale)[,,1]
+    
+    # Draw observed effects
+    y_obs[i, ] <- MASS::mvrnorm(n = 1,
+                                mu = theta_i[i, ],
+                                Sigma = Sigma_i)
     
     # Extract standard errors
     se_obs[i, 1] <- sqrt(Sigma_i[1, 1])
     se_obs[i, 2] <- sqrt(Sigma_i[2, 2])
   }
   
-  data <- data.frame(
-    Study_id = 1:K,
-    n_total = 2 * n_arm,
-    O1_yi = y_obs[, 1], O1_sei = se_obs[, 1],
-    O2_yi = y_obs[, 2], O2_sei = se_obs[, 2]
-  )
+  # Output
+  data <- data.frame(Study_id = 1:K,
+                     n_total = 2 * n_arm_i,
+                     O1_yi = y_obs[, 1],
+                     O1_sei = se_obs[, 1],
+                     O2_yi = y_obs[, 2],
+                     O2_sei = se_obs[, 2])
   
   attr(data, "theta1") <- theta[1]
   attr(data, "tau2_1") <- tau2[1]
-  attr(data, "n_arm") <- n_arm
+  attr(data, "n_arm") <- n_arm_i
   
   return(data)
 }
-
-
-
-
 
 expit <- function(x) exp(x) / (1 + exp(x))
 logit <- function(p) log(p / (1 - p))
@@ -594,58 +729,62 @@ logit <- function(p) log(p / (1 - p))
 # delta value used in the simulation 
 # selection type 
 
-
-
 impose_orb <- function(data,
                        p1 = 0.4,
-                       delta_sim = 0.5, 
-                       select_type = "zscore", 
+                       delta_sim = 0.5,
+                       select_type = "zscore",
                        orb.se = TRUE,
-                       theta_1 = 0.4,       
-                       tau2_val = 0.06,     
-                       n_arm = 50) {
- 
+                       theta_1 = 0.4,
+                       tau2_val = 0.06) { 
   
-  n_total <- n_arm * 2 # we can safely assume that both arms have the same n
+  # Study-specific sample sizes
+  n_arm_i <- data$n_total / 2
   
-  
-  # Determine the selection variable s_1 and its expected value E(s_1)
-  if (select_type == "zscore") {
-    s1 <- data$O1_yi / data$O1_sei #vector of real value 
-    E_s1 <- theta_1 / sqrt((2/n_arm) + tau2_val) #expected score to define theoretical alpha
+  # Determine selection variable s_1 and its expected value 
+  if (select_type == "zscore") { 
+    # Observed selection variable 
+    s1 <- data$O1_yi / data$O1_sei 
+    # Study-specific theoretical expected z-score
+    E_s1 <- theta_1 / sqrt((2 / n_arm_i) + tau2_val) 
   } else if (select_type == "effect") {
+    # Selection directly on observed treatment effect
     s1 <- data$O1_yi 
-    E_s1 <- theta_1 # if we do selection on effect, the exp value is directly the true value
-  } else {
-    stop("select_type must be 'zscore' or 'effect'")
-  }
+    # Expected value does not depend on sample size
+    E_s1 <- rep(theta_1, nrow(data)) 
+  } else { 
+    stop("select_type must be 'zscore' or 'effect'") 
+  } 
   
-  target_reported <- 1 - p1
+  # Determine alpha such that the average reporting probability 
+  # corresponds approximately to the target reporting rate 
+  target_reported <- 1 - p1 
   
-  # Avoid logit of 1 or 0 if p1 is extreme (this should never happen in the code)
-  if(target_reported >= 1) target_reported <- 0.999 
-  if(target_reported <= 0) target_reported <- 0.001
+  # Avoid logit of 1 or 0 
+  if (target_reported >= 1) target_reported <- 0.999 
+  if (target_reported <= 0) target_reported <- 0.001 
   
-  alpha_1 <- logit(target_reported) - (delta_sim * E_s1)
+  # With heterogeneous sample sizes, use the mean expected 
+  # selection variable to define the common intercept. 
+  alpha_1 <- logit(target_reported) - (delta_sim * mean(E_s1)) 
   
-  # Calculate reporting probabilities for each outocme
-  prob_report <- expit(alpha_1 + delta_sim * s1)
+  # Reporting probabilities 
+  prob_report <- expit(alpha_1 + delta_sim * s1) 
   
-  # Simulate reporting or not (1 = reported, 0 = missing)
+  # Simulate reporting 
   reported_flag <- rbinom(n = nrow(data),
                           size = 1, 
-                          prob = prob_report)
+                          prob = prob_report) 
   
-  # Apply missingness to Outcome 1
-  data_orb <- data
-  data_orb$O1_yi[reported_flag == 0] <- NA
+  # Apply missingness to Outcome 1 
+  data_orb <- data 
+  data_orb$O1_yi[reported_flag == 0] <- NA 
   
-  if (orb.se) data_orb$O1_sei[reported_flag == 0] <- NA 
+  if (orb.se) { 
+    data_orb$O1_sei[reported_flag == 0] <- NA 
+  } 
   
-  # add the sample size column
-  data_orb$n_total <- n_total
+  # Actual missingness 
+  attr(data_orb, "actual_missing_rate") <- sum(reported_flag == 0) / nrow(data) 
   
-  attr(data_orb, "actual_missing_rate") <- sum(reported_flag == 0) / nrow(data)
-  
-  return(data_orb)
+  return(data_orb) 
 }

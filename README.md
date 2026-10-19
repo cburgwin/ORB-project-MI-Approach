@@ -5,42 +5,57 @@
 Selective reporting of outcomes in clinical trial reports can be described as the reporting of a subset of the originally recorded outcome variables in the final report. Selective outcome reporting can create outcome reporting bias (ORB) when the decision to report results within published studies is influenced by the significance or direction of the results [^1]. Previous reviews showed that statistically significant outcomes were more likely to be fully reported than non-significant outcomes [^2]. ORB potentially undermines the credibility and validity of meta-analyses [^3] and contributes to research waste by distorting overall treatment effects [^4]. ORB can be viewed as a missing data problem where unreported outcomes introduce bias. Despite the serious implications ORB poses, it remains an underrecognized issue, with only a few adjustment methods available.
 
 ## Methods
-We propose an approach that addresses unreported outcomes in meta-analyses through multiple imputation. The imputed data are reweighted using importance sampling to provide an adjusted estimate of the treatment effect, building on existing methods for selection bias from the literature [^5]. To assess the impact of ORB in meta-analyses of clinical trials, we apply our proposed methodology to real clinical data affected by ORB. We compare the imputation of unreported outcomes in the univariate meta-analysis to the multivariate meta-analysis. Additionally, we conduct a simulation study to evaluate the method’s performance, focusing on treatment effect estimation across varying degrees of selective non-reporting. The preprint is available on [arXiv](https://arxiv.org/abs/2607.07509).
+We propose an approach that addresses unreported outcomes in meta-analyses through multiple imputation. The imputed data are reweighted using importance sampling to provide an adjusted estimate of the treatment effect, building on existing methods for selection bias from the literature [^5]. To assess the impact of ORB in meta-analyses of clinical trials, we apply our proposed methodology to real clinical data affected by ORB. We compare our approach in univariate meta-analysis and multivariate meta-analysis. Additionally, we conduct a simulation study to evaluate the method’s performance, focusing on treatment effect estimation across varying degrees of selective non-reporting. The preprint is available on [arXiv](https://arxiv.org/abs/2607.07509).
 
 ## Repository Organization
-Below is a description of the different folders and their respective contents. This ORBproject repository contains the code and source files of the paper "Adjusting for Outcome Reporting Bias in Meta-analysis: A Multiple Imputation Approach". 
+Below is a description of the different folders and their respective contents. This ORB project repository contains the code and source files of the paper "Adjusting for Outcome Reporting Bias in Meta-analysis: A Multiple Imputation Approach". 
 
 ### Paper Folder
-The folder contains the file `main.tex` file, which can be compiled to obtain the final paper `ImpSimORB`.pdf file, also included in this folder. The pdf file is the main file of the manuscript for this project, producing text abd tables. Besides, the file `Appendix.tex` needs to be downloaded for the supplementary material. The folder additionally includes the bibliography file `references.bib` and `newCommands.tex`. The figures are in the respective folder `figures`.
+The folder contains the file `main.tex` file, which can be compiled to obtain the final paper. The `main.tex` file produces text and tables. Besides, the file `Appendix.tex` needs to be downloaded for the supplementary material. The folder additionally includes the bibliography file `references.bib` and `newCommands.tex`. The figures are in the respective folder `figures`. The subfolder Revision contains the updated files from after the first revision, where we received feedback from two independent reviewers.
 
 ### Simulation Protocol Folder
-The folder contains the file `SimProtocol.Rnw` file, which can be compiled in R to obtain the `SimProtocol.pdf` file, also included in this folder. The outputted pdf file is the simulation protocol for this project, dynamically producing text, tables, and figures. This folder additionally includes the bibliography file `references.bib` and `newCommands.tex`, both are needed to compile `SimProtocol.Rnw`. The simulations conducted in the Simulation Folder, the results of which are used in the Paper Folder, are obtained following this pre-specified protocol. 
+The folder contains the file `SimProtocol.Rnw` file, which can be compiled in R to obtain the `SimProtocol.pdf` file, also included in this folder. The outputted pdf file is the simulation protocol for this project, dynamically producing text and tables. This folder additionally includes the bibliography file `references.bib` and `newCommands.tex`, both are needed to compile `SimProtocol.Rnw`. The simulations which results are used in the Paper Folder, are obtained following this pre-specified protocol. The subfolder Amendment contains all required documents which are needed to run the `Amendment.tex` file. The amendment to the simulation study protocol summarizes all changes and updates to the simulation study protocol. 
 
 ### Code Folder
 This folder contains all functions used for the project.
 - `00.Functions.R` contains all functions necessary to implement our method:
-  1. `impute_missing_se()` imputes missing standard errors for one outcome at a time using the reported studies following the formula from Copas et al. [^6].
-  2. `run_univariate_imputation()` generates the imputed data using multiple imputation for one outcome under missing at random (MAR) assumption.
-  3.  `adj_univariate()` applies ORB importance sampling on the imputed datasets generated by `run_univariate_imputation()`.
-  4.  `run_bivariate_imputation()` generates the imputed data using multiple imputation for two outcomes jointly under MAR.
-  5.  `adj_bivariate()` applies ORB importance sampling on the imputed datasets generated by `run_bivariate_imputation()`.
-  6.  `generate_bivariate_ma()` simulates complete bivariate meta-analysis data.
-  7.  `impose_orb()` imposes ORB on outcome 1 from the simulated data generated with `generate_bivariate_ma()` and returns the data with ORB-induced missingness for outcome 1.
+  
+*Preprocessing*
+1. `impute_missing_se()` imputes missing standard errors for one outcome at a time from the reported studies, following the formula from Copas et al. [^6].
+
+*Univariate method*
+
+2. `run_univariate_imputation()` generates multiple imputations of the unreported effect estimates for one outcome under missing at random (MAR). It uses the conditional normal distribution given the reported studies.
+3. `fit_imputations_uni()` fits a random-effects meta-analysis to each completed dataset. 
+4. `pool_univariate()` applies ORB importance weights to the fits from `fit_imputations_uni()` and pools them with Rubin's rules. 
+5. `adj_univariate()` wraps `fit_imputations_uni()` and `pool_univariate()`.
+
+*Bivariate method*
+
+6. `run_bivariate_imputation()` generates multiple imputations of the unreported estimates for outcome 1 under MAR, using both outcomes jointly. The within-study correlation `rho_w` can be fixed or estimated from the data (Pearson correlation, with its uncertainty propagated across imputations).
+7. `fit_imputations_bivariate()` fits a bivariate random-effects meta-analysis to each completed dataset.
+8. `pool_bivariate()` applies the ORB importance weights to the fits from `fit_imputations_biv()` and pools them with Rubin's rules. It returns adjusted estimates for both outcomes.
+9. `adj_bivariate()` wraps `fit_imputations_biv()` and `pool_bivariate()`, analogous to `adj_univariate()`.
+
+*Simulation*
+
+10. `generate_bivariate_ma()` simulates a complete bivariate meta-analysis, with true study effects drawn from a bivariate normal and within-study covariances from a Wishart. It optionally includes one large study (heterogeneous study sizes).
+11. `impose_orb()` imposes ORB on outcome 1 of the data from `generate_bivariate_ma()`. Studies are selected via a logistic reporting model on the z-score or the effect, calibrated to a target reporting rate. 
+
 - `01.Application_prep.R`creates the topiramate dataset `df_topiramate.rds` in the data folder.
 - `02.Application_fit.R` uses the data created with `01.Application_prep.R`, sources `00.Functions.R` and adjusts for ORB. It also produces `Table_2.rds` in data folder, which corresponds to table 2 in the paper.
 - `03.Application_Plots.Rmd` reads the datasets created with `02.Application_fit.R`, which are saved in the data folder, and creates all plots for the application.
 - `04.SimulationStudy.R` runs a loop over the functions in `00.Functions.R` for all considered scenarios in the simulation study.
-- `05.SimulationStudy_Plots.Rmd` reads the datasets created with `05.SimulationStudy.R`, which are saved in the data folder (`data_simulation_S.csv` and `data_simulation_supp.csv`) and creates all plots for the simulation study.
+- `05.SimulationStudy_Plots.Rmd` reads the datasets created with `05.SimulationStudy.R`, which are saved in the `Data/Sim_summary` folder, and creates all plots for the simulation study.
 
 ### Data Folder
 This folder contains all data for the application as well as the simulation study.
-- `data_biv_df_S.csv` contains the data for the bivariate ORB adjustment of the real clinical data affected by ORB.
-- `data_uni_df_O1.csv` contains the data for univariate ORB adjustment for outcome 1 "50% seizure reduction" from the applicatio.
+- `data_biv_df.csv` contains the data for the bivariate ORB adjustment of the real clinical data affected by ORB.
+- `data_uni_df_O1.csv` contains the data for univariate ORB adjustment for outcome 1 "50% seizure reduction" from the application.
 - `data_uni_df_O2.csv` contains the data for univariate ORB adjustment for outcome 2 "seizure freedom" from the application.
 - `df_topiramate.rds` is created by file `01.Application_prep.R` and contains the real clinical data affected by ORB.
 - `Table_2.rds` is produced by file `02.Application_fit.R` and provides the results for the forest plot in the final paper.
-- `data_simulation_S.csv` contains the data from the simulation study for the plots in the main paper.
-- `data_simulation_supp.csv` contains the data from the simulation study for the supplementary material.
+- `Sim_summary/` contains all datasets for the simulation study.
 
 ## Reproducibility
 To ensure the reproducibility of this analysis, the computational environment details are provided below. 
@@ -171,7 +186,6 @@ A BibTeX entry is given by
 [^2]: Kerry Dwan, Carrol Gamble, Paula R Williamson, Jamie J Kirkham, and Reporting Bias Group. Systematic review of the empirical evidence of study publication bias and outcome
 reporting bias—an updated review. PloS one, 8(7):e66844, 2013. doi: https://doi.org/10.1371/journal.pone.0066844.
 [^3]: John PA Ioannidis. Clinical trials: what a waste. BMJ, 349, 2014. doi: https://doi.org/10.1136/bmj.g7089.
-[^4]: Elizabeth T Thomas and Carl Heneghan. Catalogue of bias: selective outcome reporting bias. BMJ Evidence-Based Medicine, 27(6):370–372, 2022. doi: https://doi.org/10.1136/
-bmjebm-2021-111845.
+[^4]: Elizabeth T Thomas and Carl Heneghan. Catalogue of bias: selective outcome reporting bias. BMJ Evidence-Based Medicine, 27(6):370–372, 2022. doi: https://doi.org/10.1136/bmjebm-2021-111845.
 [^5]: James Carpenter, Gerta Rücker, and Guido Schwarzer. Assessing the sensitivity of meta-analysis to selection bias: a multiple imputation approach. Biometrics, 67(3):1066–1072, 2011. doi: https://doi.org/10.1111/j.1541-0420.2010.01498.x
 [^6]: John Copas, Kerry Dwan, Jamie Kirkham, and Paula Williamson. A Model-based Correction for Outcome Reporting Bias in Meta-analysis. Biostatistics, 15(2):370–383, 2014. doi: https://doi.org/10.1093/biostatistics/kxt046
